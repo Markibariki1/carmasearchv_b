@@ -1,7 +1,7 @@
 "use client"
 /* eslint-disable @next/next/no-img-element */
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ExternalLink,
   LayoutDashboard,
   Link as LinkIcon,
   Loader2,
@@ -35,13 +36,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { CompareModal } from "@/components/compare-modal"
 import { AuthModal } from "@/components/auth-modal-b"
 import { MobileMenuB } from "@/components/mobile-menu-b"
 import { LogoScrollWheel } from "@/components/logo-scroll-wheel"
 import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
-import { getDatabaseStats } from "@/lib/api"
+import { getDatabaseStats, compareVehicle, formatDealScore, formatPrice, formatMileage, ComparablesResponse } from "@/lib/api"
 
 // Animated number that counts up on scroll into view
 function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
@@ -114,12 +114,15 @@ const mockResults = [
 
 export default function HomePageB() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
-  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [authMode, setAuthMode] = useState<"login" | "signup">("signup")
   const [heroUrl, setHeroUrl] = useState("")
   const [isHeroSearching, setIsHeroSearching] = useState(false)
   const [vehicleCount, setVehicleCount] = useState(2_800_000)
+  const [heroResults, setHeroResults] = useState<ComparablesResponse | null>(null)
+  const [heroError, setHeroError] = useState("")
+  const heroRequestRef = useRef<AbortController | null>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
   const [showHeroFilters, setShowHeroFilters] = useState(false)
   const [heroRegFrom, setHeroRegFrom] = useState("")
   const [heroRegUntil, setHeroRegUntil] = useState("")
@@ -148,25 +151,51 @@ export default function HomePageB() {
     }
   }, [])
 
-  const handleHeroCompare = () => {
+  const handleHeroCompare = async () => {
     if (!heroUrl.trim()) {
-      toast({
-        title: "Enter a URL",
-        description: "Paste a vehicle listing URL to get started.",
-      })
+      toast({ title: "Enter a URL", description: "Paste a vehicle listing URL to get started." })
       return
     }
     if (!isAuthenticated) {
       setAuthMode("signup")
       setIsAuthModalOpen(true)
-      toast({
-        title: "Create a free account",
-        description: "Sign up to compare vehicles instantly.",
-      })
+      toast({ title: "Create a free account", description: "Sign up to compare vehicles instantly." })
       return
     }
-    setIsCompareModalOpen(true)
+
+    if (heroRequestRef.current) {
+      heroRequestRef.current.abort()
+    }
+    setIsHeroSearching(true)
+    setHeroResults(null)
+    setHeroError("")
+
+    const controller = new AbortController()
+    heroRequestRef.current = controller
+
+    try {
+      const results = await compareVehicle(heroUrl.trim(), { top: 12, signal: controller.signal })
+      setHeroResults(results)
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50)
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return
+      setHeroError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+    } finally {
+      setIsHeroSearching(false)
+    }
   }
+
+  const filteredHeroComparables = useMemo(() => {
+    if (!heroResults) return []
+    return heroResults.comparables.filter((v) => {
+      if (heroExtColors.length > 0 && !heroExtColors.includes(v.exterior_color || "Other")) return false
+      if (heroRegFrom && v.year < parseInt(heroRegFrom)) return false
+      if (heroRegUntil && v.year > parseInt(heroRegUntil)) return false
+      if (heroMileFrom && v.mileage_km < parseInt(heroMileFrom)) return false
+      if (heroMileUntil && v.mileage_km > parseInt(heroMileUntil)) return false
+      return true
+    }).slice(0, 12)
+  }, [heroResults, heroExtColors, heroRegFrom, heroRegUntil, heroMileFrom, heroMileUntil])
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
@@ -546,6 +575,129 @@ export default function HomePageB() {
           </div>
         </div>
       </section>
+
+      {/* Inline Comparison Results */}
+      {(isHeroSearching || heroResults || heroError) && (
+        <section ref={resultsRef} className="py-10 px-4 border-t border-border">
+          <div className="container mx-auto max-w-5xl">
+
+            {/* Loading */}
+            {isHeroSearching && (
+              <div className="flex items-center justify-center gap-3 py-20 text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span>Finding similar vehicles…</span>
+              </div>
+            )}
+
+            {/* Error */}
+            {heroError && !isHeroSearching && (
+              <div className="text-center py-12 space-y-3">
+                <p className="text-destructive font-medium">{heroError}</p>
+                <Button variant="outline" size="sm" onClick={() => setHeroError("")}>Dismiss</Button>
+              </div>
+            )}
+
+            {/* Results */}
+            {heroResults && !isHeroSearching && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold">{filteredHeroComparables.length} similar vehicles found</h2>
+                    <p className="text-sm text-muted-foreground">
+                      for {heroResults.vehicle.make} {heroResults.vehicle.model} · {heroResults.vehicle.year}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => { setHeroResults(null); setHeroError("") }}>
+                    New Search
+                  </Button>
+                </div>
+
+                {/* Analyzed vehicle */}
+                <Card className="p-4 border-primary/20 bg-primary/5">
+                  <div className="flex items-center gap-4">
+                    {heroResults.vehicle.images?.[0] && (
+                      <img
+                        src={heroResults.vehicle.images[0]}
+                        alt=""
+                        className="w-28 h-18 object-cover rounded-lg shrink-0 hidden sm:block"
+                        style={{ height: "72px" }}
+                        onError={(e) => { e.currentTarget.style.display = "none" }}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] font-semibold bg-primary/15 text-primary px-1.5 py-0.5 rounded">Your listing</span>
+                      <p className="font-semibold mt-0.5">{heroResults.vehicle.make} {heroResults.vehicle.model}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {heroResults.vehicle.year} · {heroResults.vehicle.fuel_group} · {heroResults.vehicle.transmission_group} · {formatMileage(heroResults.vehicle.mileage_km)}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xl font-bold text-primary">{formatPrice(heroResults.vehicle.price_eur)}</p>
+                      <p className={`text-sm font-medium ${formatDealScore(heroResults.vehicle.deal_score).class}`}>
+                        {formatDealScore(heroResults.vehicle.deal_score).text}
+                      </p>
+                      <a href={heroResults.vehicle.url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1">
+                        View listing <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Comparable vehicles */}
+                <div className="space-y-3">
+                  {filteredHeroComparables.map((v, i) => {
+                    const deal = formatDealScore(v.deal_score)
+                    const matchPct = v.final_score != null
+                      ? Math.round(v.final_score * 100)
+                      : v.similarity_score != null
+                      ? Math.round(v.similarity_score * 100)
+                      : null
+                    return (
+                      <Card key={v.id} className="p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm font-bold text-muted-foreground w-5 shrink-0 text-center">#{i + 1}</span>
+                          {v.images?.[0] ? (
+                            <img
+                              src={v.images[0]}
+                              alt=""
+                              className="w-20 h-14 object-cover rounded-lg shrink-0 hidden sm:block"
+                              onError={(e) => { e.currentTarget.style.display = "none" }}
+                            />
+                          ) : (
+                            <div className="w-20 h-14 bg-muted rounded-lg shrink-0 hidden sm:block" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold truncate">{v.make} {v.model}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {v.year} · {v.fuel_group} · {v.transmission_group} · {formatMileage(v.mileage_km)}
+                            </p>
+                            {v.exterior_color && (
+                              <p className="text-xs text-muted-foreground">{v.exterior_color}</p>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-bold text-primary">{formatPrice(v.price_eur)}</p>
+                            <p className={`text-xs font-medium ${deal.class}`}>{deal.text}</p>
+                            {matchPct != null && (
+                              <p className="text-xs text-muted-foreground">{matchPct}% match</p>
+                            )}
+                            <a href={v.url} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1">
+                              View <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        </div>
+                      </Card>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Trusted By / Logo Scroll */}
       <section className="py-6 border-y border-border bg-muted/30">
@@ -986,19 +1138,6 @@ export default function HomePageB() {
       </footer>
 
       {/* Modals */}
-      <CompareModal
-        isOpen={isCompareModalOpen}
-        onClose={() => setIsCompareModalOpen(false)}
-        className="theme-b"
-        initialUrl={heroUrl}
-        initialFilters={{
-          regFrom: heroRegFrom,
-          regUntil: heroRegUntil,
-          mileFrom: heroMileFrom,
-          mileUntil: heroMileUntil,
-          extColors: heroExtColors,
-        }}
-      />
       <MobileMenuB isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
       <AuthModal
         isOpen={isAuthModalOpen}
