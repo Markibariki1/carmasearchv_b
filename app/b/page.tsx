@@ -572,7 +572,7 @@ export default function HomePageB() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
             <div className="text-center">
               <div className="text-3xl md:text-4xl font-bold text-primary mb-1">
-                <CountUp target={Math.floor(vehicleCount / 1000)} suffix="k+" />
+                <CountUp key={vehicleCount} target={Math.floor(vehicleCount / 1000)} suffix="k+" />
               </div>
               <p className="text-sm text-muted-foreground">Vehicles Tracked</p>
             </div>
