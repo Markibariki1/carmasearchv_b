@@ -10,6 +10,7 @@ import {
   BarChart3,
   Bell,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   LayoutDashboard,
   Link as LinkIcon,
@@ -19,6 +20,7 @@ import {
   Search,
   Settings,
   Shield,
+  SlidersHorizontal,
   Sparkles,
   Star,
   TrendingDown,
@@ -86,6 +88,22 @@ function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
   )
 }
 
+const EXTERIOR_COLORS = [
+  { name: "Black",  hex: "#1a1a1a" },
+  { name: "White",  hex: "#FFFFFF" },
+  { name: "Silver", hex: "#C0C0C0" },
+  { name: "Gray",   hex: "#808080" },
+  { name: "Blue",   hex: "#2563EB" },
+  { name: "Red",    hex: "#DC2626" },
+  { name: "Green",  hex: "#16a34a" },
+  { name: "Brown",  hex: "#8B4513" },
+  { name: "Beige",  hex: "#F5F5DC" },
+  { name: "Orange", hex: "#F97316" },
+  { name: "Yellow", hex: "#EAB308" },
+]
+
+const REGISTRATION_YEARS = ["2013","2014","2015","2016","2017","2018","2019","2020","2021","2022","2023","2024","2025"]
+
 const mockResults = [
   { name: "2023 Tesla Model 3 LR", specs: "42,000 km · Silver · AWD · AutoScout24", price: "€42,990", score: 94, delta: -3010 },
   { name: "2023 Tesla Model 3 LR", specs: "38,500 km · White · AWD · Mobile.de",   price: "€43,500", score: 87, delta: -2500 },
@@ -102,6 +120,12 @@ export default function HomePageB() {
   const [heroUrl, setHeroUrl] = useState("")
   const [isHeroSearching, setIsHeroSearching] = useState(false)
   const [vehicleCount, setVehicleCount] = useState(250000)
+  const [showHeroFilters, setShowHeroFilters] = useState(false)
+  const [heroRegFrom, setHeroRegFrom] = useState("")
+  const [heroRegUntil, setHeroRegUntil] = useState("")
+  const [heroMileFrom, setHeroMileFrom] = useState("")
+  const [heroMileUntil, setHeroMileUntil] = useState("")
+  const [heroExtColors, setHeroExtColors] = useState<string[]>([])
   const { user, isAuthenticated, signOut } = useAuth()
   const { toast } = useToast()
 
@@ -292,7 +316,7 @@ export default function HomePageB() {
               </p>
 
               {/* Inline URL search bar */}
-              <div className="flex flex-col sm:flex-row gap-3 mb-6">
+              <div className="flex flex-col sm:flex-row gap-3 mb-3">
                 <div className="relative flex-1">
                   <LinkIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -320,6 +344,111 @@ export default function HomePageB() {
                   )}
                 </Button>
               </div>
+
+              {/* Filters toggle */}
+              <div className="flex items-center gap-3 mb-4">
+                <button
+                  onClick={() => setShowHeroFilters(!showHeroFilters)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  Filters
+                  <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showHeroFilters ? "rotate-180" : ""}`} />
+                </button>
+                {heroExtColors.length > 0 && (
+                  <span className="text-xs text-primary font-medium">
+                    {heroExtColors.length} color{heroExtColors.length > 1 ? "s" : ""} selected
+                  </span>
+                )}
+                {(heroRegFrom || heroRegUntil) && (
+                  <span className="text-xs text-primary font-medium">
+                    {heroRegFrom || "any"}–{heroRegUntil || "any"}
+                  </span>
+                )}
+              </div>
+
+              {/* Inline filter panel */}
+              {showHeroFilters && (
+                <div className="mb-5 p-4 rounded-xl bg-muted/50 border border-border space-y-4">
+                  {/* Year + Mileage row */}
+                  <div className="flex flex-wrap gap-x-6 gap-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground font-medium w-8">Year</span>
+                      <select
+                        value={heroRegFrom}
+                        onChange={(e) => setHeroRegFrom(e.target.value)}
+                        className="h-7 text-xs bg-background border border-border rounded-lg px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="">From</option>
+                        {REGISTRATION_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                      <span className="text-xs text-muted-foreground">–</span>
+                      <select
+                        value={heroRegUntil}
+                        onChange={(e) => setHeroRegUntil(e.target.value)}
+                        className="h-7 text-xs bg-background border border-border rounded-lg px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="">Until</option>
+                        {REGISTRATION_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground font-medium w-14">Mileage</span>
+                      <input
+                        type="number"
+                        placeholder="From"
+                        value={heroMileFrom}
+                        onChange={(e) => setHeroMileFrom(e.target.value)}
+                        className="h-7 text-xs bg-background border border-border rounded-lg px-2 w-20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <span className="text-xs text-muted-foreground">–</span>
+                      <input
+                        type="number"
+                        placeholder="Until"
+                        value={heroMileUntil}
+                        onChange={(e) => setHeroMileUntil(e.target.value)}
+                        className="h-7 text-xs bg-background border border-border rounded-lg px-2 w-20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <span className="text-xs text-muted-foreground">km</span>
+                    </div>
+                  </div>
+
+                  {/* Color swatches */}
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium mb-2">Exterior Color</p>
+                    <div className="flex flex-wrap gap-2">
+                      {EXTERIOR_COLORS.map((color) => (
+                        <button
+                          key={color.name}
+                          title={color.name}
+                          onClick={() =>
+                            setHeroExtColors((prev) =>
+                              prev.includes(color.name)
+                                ? prev.filter((c) => c !== color.name)
+                                : [...prev, color.name]
+                            )
+                          }
+                          className={`w-6 h-6 rounded-full border-2 transition-all duration-150 ${
+                            heroExtColors.includes(color.name)
+                              ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-110"
+                              : "border-transparent hover:border-muted-foreground hover:scale-105"
+                          } ${color.name === "White" ? "shadow-sm" : ""}`}
+                          style={{ backgroundColor: color.hex }}
+                        />
+                      ))}
+                      {heroExtColors.length > 0 && (
+                        <button
+                          onClick={() => setHeroExtColors([])}
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors self-center ml-1"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center gap-6 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
@@ -854,7 +983,19 @@ export default function HomePageB() {
       </footer>
 
       {/* Modals */}
-      <CompareModal isOpen={isCompareModalOpen} onClose={() => setIsCompareModalOpen(false)} className="theme-b" />
+      <CompareModal
+        isOpen={isCompareModalOpen}
+        onClose={() => setIsCompareModalOpen(false)}
+        className="theme-b"
+        initialUrl={heroUrl}
+        initialFilters={{
+          regFrom: heroRegFrom,
+          regUntil: heroRegUntil,
+          mileFrom: heroMileFrom,
+          mileUntil: heroMileUntil,
+          extColors: heroExtColors,
+        }}
+      />
       <MobileMenuB isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
       <AuthModal
         isOpen={isAuthModalOpen}

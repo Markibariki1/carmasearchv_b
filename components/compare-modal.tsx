@@ -14,13 +14,26 @@ import { Link as LinkIcon, ChevronDown, Star, TrendingUp, TrendingDown, External
 import { useToast } from "@/hooks/use-toast"
 import { compareVehicle, formatDealScore, formatPrice, formatMileage, Vehicle, ComparablesResponse } from "@/lib/api"
 
+interface FilterState {
+  regFrom?: string
+  regUntil?: string
+  mileFrom?: string
+  mileUntil?: string
+  extColors?: string[]
+  intColors?: string[]
+}
+
 interface CompareModalProps {
   isOpen: boolean
   onClose: () => void
   className?: string
+  /** Pre-fill URL and auto-start comparison immediately on open */
+  initialUrl?: string
+  /** Pre-set filter values from the hero section */
+  initialFilters?: FilterState
 }
 
-export function CompareModal({ isOpen, onClose, className }: CompareModalProps) {
+export function CompareModal({ isOpen, onClose, className, initialUrl, initialFilters }: CompareModalProps) {
   const [vehicleUrl, setVehicleUrl] = useState("")
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [selectedExteriorColors, setSelectedExteriorColors] = useState<string[]>([])
@@ -38,6 +51,7 @@ export function CompareModal({ isOpen, onClose, className }: CompareModalProps) 
   const [error, setError] = useState<string>("")
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const activeRequest = useRef<AbortController | null>(null)
+  const autoStarted = useRef(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -100,8 +114,9 @@ export function CompareModal({ isOpen, onClose, className }: CompareModalProps) 
     }
   }
 
-  const handleCompare = async () => {
-    if (!vehicleUrl.trim()) {
+  const handleCompare = async (urlOverride?: string) => {
+    const url = (urlOverride ?? vehicleUrl).trim()
+    if (!url) {
       toast({
         title: "URL Required",
         description: "Please enter a vehicle listing URL to compare.",
@@ -122,7 +137,7 @@ export function CompareModal({ isOpen, onClose, className }: CompareModalProps) 
     activeRequest.current = controller
 
     try {
-      const results = await compareVehicle(vehicleUrl.trim(), {
+      const results = await compareVehicle(url, {
         top: 12,
         signal: controller.signal
       })
@@ -156,6 +171,27 @@ export function CompareModal({ isOpen, onClose, className }: CompareModalProps) 
   const handleSaveAndCompare = () => {
     handleCompare()
   }
+
+  // Auto-start comparison when initialUrl is provided
+  useEffect(() => {
+    if (!isOpen) {
+      autoStarted.current = false
+      return
+    }
+    if (!initialUrl?.trim() || autoStarted.current) return
+    autoStarted.current = true
+    setVehicleUrl(initialUrl)
+    if (initialFilters) {
+      if (initialFilters.regFrom) setRegistrationFrom(initialFilters.regFrom)
+      if (initialFilters.regUntil) setRegistrationUntil(initialFilters.regUntil)
+      if (initialFilters.mileFrom) setMileageFrom(initialFilters.mileFrom)
+      if (initialFilters.mileUntil) setMileageUntil(initialFilters.mileUntil)
+      if (initialFilters.extColors?.length) setSelectedExteriorColors(initialFilters.extColors)
+      if (initialFilters.intColors?.length) setSelectedInteriorColors(initialFilters.intColors)
+    }
+    handleCompare(initialUrl)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialUrl])
 
   useEffect(() => {
     if (!isOpen) {
@@ -249,33 +285,45 @@ export function CompareModal({ isOpen, onClose, className }: CompareModalProps) 
 
         <div className="space-y-8">
           {/* URL Input Section */}
-          <div className="space-y-4">
-            <Label htmlFor="vehicle-url" className="text-foreground text-sm font-medium">Vehicle Listing URL</Label>
-            <div className="relative">
-              <LinkIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="vehicle-url"
-                type="url"
-                placeholder="Paste AutoScout24 vehicle listing URL (e.g., https://www.autoscout24.de/angebote/...)"
-                value={vehicleUrl}
-                onChange={(e) => setVehicleUrl(e.target.value)}
-                className="pl-12 bg-muted border border-border rounded-2xl h-14 text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-0"
-                disabled={isSearching}
-              />
+          {initialUrl ? (
+            <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-xl border border-border">
+              <LinkIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground mb-0.5">Analyzing listing</p>
+                <p className="text-sm font-medium text-foreground truncate">{initialUrl}</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              <Label htmlFor="vehicle-url" className="text-foreground text-sm font-medium">Vehicle Listing URL</Label>
+              <div className="relative">
+                <LinkIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="vehicle-url"
+                  type="url"
+                  placeholder="Paste AutoScout24 vehicle listing URL (e.g., https://www.autoscout24.de/angebote/...)"
+                  value={vehicleUrl}
+                  onChange={(e) => setVehicleUrl(e.target.value)}
+                  className="pl-12 bg-muted border border-border rounded-2xl h-14 text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-0"
+                  disabled={isSearching}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Advanced Options Toggle */}
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-sm text-muted-foreground hover:text-foreground p-0"
-            >
-              Advanced Options
-              <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-            </Button>
-          </div>
+          {!initialUrl && (
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-sm text-muted-foreground hover:text-foreground p-0"
+              >
+                Advanced Options
+                <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+              </Button>
+            </div>
+          )}
 
           {/* Advanced Options */}
           {showAdvanced && (
@@ -470,12 +518,12 @@ export function CompareModal({ isOpen, onClose, className }: CompareModalProps) 
             </Card>
           )}
 
-          {/* Simple Compare Button */}
-          {!showAdvanced && (
+          {/* Simple Compare Button / Auto-start indicator */}
+          {!showAdvanced && !initialUrl && (
             <div className="flex justify-center">
-              <Button 
-                onClick={handleCompare} 
-                disabled={isSearching} 
+              <Button
+                onClick={() => handleCompare()}
+                disabled={isSearching}
                 size="lg"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-2xl px-8 py-3 text-lg"
               >
@@ -488,6 +536,14 @@ export function CompareModal({ isOpen, onClose, className }: CompareModalProps) 
                   "Compare with CARMA AI"
                 )}
               </Button>
+            </div>
+          )}
+          {initialUrl && isSearching && (
+            <div className="flex justify-center">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-sm">Analyzing vehicle...</span>
+              </div>
             </div>
           )}
 
