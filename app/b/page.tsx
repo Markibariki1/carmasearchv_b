@@ -119,7 +119,7 @@ export default function HomePageB() {
   const [authMode, setAuthMode] = useState<"login" | "signup">("signup")
   const [heroUrl, setHeroUrl] = useState("")
   const [isHeroSearching, setIsHeroSearching] = useState(false)
-  const [vehicleCount, setVehicleCount] = useState(250000)
+  const [vehicleCount, setVehicleCount] = useState(2_800_000)
   const [showHeroFilters, setShowHeroFilters] = useState(false)
   const [heroRegFrom, setHeroRegFrom] = useState("")
   const [heroRegUntil, setHeroRegUntil] = useState("")
@@ -572,7 +572,10 @@ export default function HomePageB() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
             <div className="text-center">
               <div className="text-3xl md:text-4xl font-bold text-primary mb-1">
-                <CountUp key={vehicleCount} target={Math.floor(vehicleCount / 1000)} suffix="k+" />
+                {vehicleCount >= 1_000_000
+                  ? <CountUp key={vehicleCount} target={Math.floor(vehicleCount / 1_000_000)} suffix={`.${Math.floor((vehicleCount % 1_000_000) / 100_000)}M+`} />
+                  : <CountUp key={vehicleCount} target={Math.floor(vehicleCount / 1_000)} suffix="k+" />
+                }
               </div>
               <p className="text-sm text-muted-foreground">Vehicles Tracked</p>
             </div>
