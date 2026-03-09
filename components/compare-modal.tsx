@@ -178,9 +178,11 @@ export function CompareModal({ isOpen, onClose, className, initialUrl, initialFi
       autoStarted.current = false
       return
     }
-    if (!initialUrl?.trim() || autoStarted.current) return
+    const url = initialUrl?.trim()
+    if (!url || autoStarted.current) return
     autoStarted.current = true
-    setVehicleUrl(initialUrl)
+
+    // Apply filters from hero
     if (initialFilters) {
       if (initialFilters.regFrom) setRegistrationFrom(initialFilters.regFrom)
       if (initialFilters.regUntil) setRegistrationUntil(initialFilters.regUntil)
@@ -189,7 +191,36 @@ export function CompareModal({ isOpen, onClose, className, initialUrl, initialFi
       if (initialFilters.extColors?.length) setSelectedExteriorColors(initialFilters.extColors)
       if (initialFilters.intColors?.length) setSelectedInteriorColors(initialFilters.intColors)
     }
-    handleCompare(initialUrl)
+
+    // Inline comparison — avoids stale-closure issues with handleCompare
+    if (activeRequest.current) {
+      activeRequest.current.abort()
+      activeRequest.current = null
+    }
+    setIsSearching(true)
+    setError("")
+
+    const controller = new AbortController()
+    activeRequest.current = controller
+
+    compareVehicle(url, { top: 12, signal: controller.signal })
+      .then((results) => {
+        setSearchResults(results)
+        toast({
+          title: "Comparison Complete!",
+          description: `Found ${results.comparables.length} similar vehicles using CARMA's AI matching.`,
+        })
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return
+        const msg = err instanceof Error ? err.message : "An unexpected error occurred"
+        setError(msg)
+        toast({ title: "Comparison Failed", description: msg, variant: "destructive" })
+      })
+      .finally(() => {
+        if (activeRequest.current === controller) activeRequest.current = null
+        setIsSearching(false)
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialUrl])
 
@@ -538,8 +569,8 @@ export function CompareModal({ isOpen, onClose, className, initialUrl, initialFi
               </Button>
             </div>
           )}
-          {initialUrl && isSearching && (
-            <div className="flex justify-center">
+          {isSearching && !searchResults && (
+            <div className="flex justify-center py-4">
               <div className="flex items-center gap-3 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 <span className="text-sm">Analyzing vehicle...</span>
