@@ -746,7 +746,7 @@ export default function HomePageB() {
               { src: '/AutoScout24_primary_solid.png', alt: 'AutoScout24', href: 'https://www.autoscout24.de', heightClass: 'h-10' },
               { src: '/AutoTrader_logo.svg.png', alt: 'AutoTrader', href: 'https://www.autotrader.com', heightClass: 'h-8' },
               { src: '/Logo_von_mobile.de_2025-05.svg.png', alt: 'Mobile.de', href: 'https://www.mobile.de', heightClass: 'h-10' },
-              { src: '/Marktplaats.nl-Logo.wine.png', alt: 'Marktplaats', href: 'https://www.marktplaats.nl', heightClass: 'h-16' },
+              { src: '/marktplaats-logo-cropped.png', alt: 'Marktplaats', href: 'https://www.marktplaats.nl', heightClass: 'h-10' },
               { src: '/otomoto_logotyp.png', alt: 'Otomoto', href: 'https://www.otomoto.pl', heightClass: 'h-10' },
             ]}
           />
