@@ -9,7 +9,7 @@ echo "=============================="
 echo ""
 
 # Configuration
-VERSION="v1-clean-architecture" # New version for clean rebuild
+VERSION="v5.2-split-$(date +%s)" # API split: comparison-only
 IMAGE_NAME="carma-api"
 REGISTRY="carmaregistry.azurecr.io"
 CONTAINER_APP="carma-ml-api"

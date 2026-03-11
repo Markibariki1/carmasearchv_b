@@ -5,174 +5,75 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TrendingUp, TrendingDown, Eye, Edit, Trash2, Search, Filter, Plus } from "lucide-react"
-import Image from "next/image"
-import { useState, useEffect } from "react"
+import { TrendingUp, TrendingDown, Eye, Edit, Trash2, Search, Filter, Plus, RefreshCw, Loader2 } from "lucide-react"
+import { useState, useMemo } from "react"
 import { VehicleDetailsModal } from "./vehicle-details-modal"
-import { SimpleAddVehicleModal } from "./simple-add-vehicle-modal"
+import { AddVehicleWizard } from "./add-vehicle-wizard"
 import { useToast } from "@/hooks/use-toast"
-import { ToastAction } from "@/components/ui/toast"
+import type { PortfolioVehicle, PortfolioVehicleInsert, PortfolioVehicleUpdate } from "@/types/portfolio"
 
-interface Vehicle {
-  id: string
-  make: string
-  model: string
-  year: number
-  trim?: string
-  image: string
-  currentValue: number
-  originalPrice: number
-  daysOwned: number
-  lastUpdated: string
-  mileage?: number
+interface VehicleListProps {
+  vehicles: PortfolioVehicle[]
+  onDelete: (id: string) => Promise<boolean>
+  onUpdate: (id: string, data: PortfolioVehicleUpdate) => Promise<boolean>
+  onRefreshValuation: (id: string) => Promise<boolean>
+  onAddVehicle: () => void
 }
 
-const mockVehicles: Vehicle[] = [
-  {
-    id: "1",
-    make: "BMW",
-    model: "M3",
-    year: 2019,
-    trim: "Competition",
-    image: "/2019-bmw-m3-competition-silver.jpg",
-    currentValue: 65000,
-    originalPrice: 55000,
-    daysOwned: 847,
-    lastUpdated: "2 hours ago",
-    mileage: 28500,
-  },
-  {
-    id: "2",
-    make: "Porsche",
-    model: "911",
-    year: 2020,
-    trim: "Carrera S",
-    image: "/2020-porsche-911-carrera-s-white.jpg",
-    currentValue: 98000,
-    originalPrice: 105000,
-    daysOwned: 623,
-    lastUpdated: "1 day ago",
-    mileage: 15200,
-  },
-  {
-    id: "3",
-    make: "Tesla",
-    model: "Model S",
-    year: 2021,
-    trim: "Plaid",
-    image: "/2021-tesla-model-s-plaid-black.jpg",
-    currentValue: 85000,
-    originalPrice: 120000,
-    daysOwned: 456,
-    lastUpdated: "3 hours ago",
-    mileage: 22100,
-  },
-  {
-    id: "4",
-    make: "Mercedes-AMG",
-    model: "GT",
-    year: 2022,
-    trim: "63 S",
-    image: "/2022-mercedes-amg-gt-63-s-blue.jpg",
-    currentValue: 145000,
-    originalPrice: 135000,
-    daysOwned: 234,
-    lastUpdated: "5 hours ago",
-    mileage: 8900,
-  },
-  {
-    id: "5",
-    make: "Audi",
-    model: "RS6",
-    year: 2020,
-    trim: "Avant",
-    image: "/2020-audi-rs6-avant-gray.jpg",
-    currentValue: 78000,
-    originalPrice: 82000,
-    daysOwned: 512,
-    lastUpdated: "1 day ago",
-    mileage: 31200,
-  },
-  {
-    id: "6",
-    make: "Lamborghini",
-    model: "Huracán",
-    year: 2021,
-    trim: "EVO",
-    image: "/2021-lamborghini-huracan-evo-orange.jpg",
-    currentValue: 235000,
-    originalPrice: 210000,
-    daysOwned: 389,
-    lastUpdated: "4 hours ago",
-    mileage: 12800,
-  },
-]
-
-function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
+function VehicleCard({
+  vehicle,
+  onDelete,
+  onUpdate,
+  onRefreshValuation,
+}: {
+  vehicle: PortfolioVehicle
+  onDelete: (id: string) => Promise<boolean>
+  onUpdate: (id: string, data: PortfolioVehicleUpdate) => Promise<boolean>
+  onRefreshValuation: (id: string) => Promise<boolean>
+}) {
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const { toast } = useToast()
 
-  const gainLoss = vehicle.currentValue - vehicle.originalPrice
-  const gainLossPercentage = ((gainLoss / vehicle.originalPrice) * 100).toFixed(1)
+  const currentVal = vehicle.current_market_value ?? vehicle.purchase_price
+  const gainLoss = currentVal - vehicle.purchase_price
+  const gainLossPercentage = vehicle.purchase_price > 0 ? ((gainLoss / vehicle.purchase_price) * 100).toFixed(1) : "0.0"
   const isGain = gainLoss >= 0
+  const hasValuation = vehicle.current_market_value != null
 
-  const handleEdit = () => {
-    toast({
-      title: "Edit Vehicle",
-      description: `Opening edit form for ${vehicle.year} ${vehicle.make} ${vehicle.model}...`,
-    })
-    setTimeout(() => {
+  const daysOwned = vehicle.purchase_date
+    ? Math.floor((Date.now() - new Date(vehicle.purchase_date).getTime()) / (1000 * 60 * 60 * 24))
+    : 0
+
+  const handleDelete = async () => {
+    const confirmed = window.confirm(`Remove ${vehicle.year} ${vehicle.make} ${vehicle.model} from your portfolio?`)
+    if (!confirmed) return
+
+    setIsDeleting(true)
+    const success = await onDelete(vehicle.id)
+    if (success) {
       toast({
-        title: "Edit Form Ready",
-        description: "You can now update vehicle details, mileage, and condition.",
+        title: "Vehicle Removed",
+        description: `${vehicle.year} ${vehicle.make} ${vehicle.model} has been removed from your portfolio.`,
       })
-    }, 1000)
+    } else {
+      toast({ title: "Error", description: "Failed to remove vehicle.", variant: "destructive" })
+    }
+    setIsDeleting(false)
   }
 
-  const handleDelete = () => {
-    toast({
-      title: "Delete Vehicle",
-      description: `Are you sure you want to remove ${vehicle.year} ${vehicle.make} ${vehicle.model} from your portfolio?`,
-      action: (
-        <ToastAction
-          altText="Confirm Delete"
-          onClick={() => {
-            toast({
-              title: "Vehicle Removed",
-              description: `${vehicle.year} ${vehicle.make} ${vehicle.model} has been removed from your portfolio.`,
-            })
-          }}
-        >
-          Confirm Delete
-        </ToastAction>
-      ),
-    })
+  const handleEditSubmit = async (data: PortfolioVehicleInsert) => {
+    const success = await onUpdate(vehicle.id, data)
+    if (!success) throw new Error("Failed to update vehicle")
   }
 
   return (
     <>
       <Card className="border-border/50 hover:border-primary/50 transition-colors">
         <CardContent className="p-0">
-          <div className="relative h-48 w-full overflow-hidden rounded-t-lg">
-            <Image
-              src={
-                vehicle.image ||
-                `/placeholder.svg?height=200&width=400&query=${vehicle.year || "/placeholder.svg"} ${vehicle.make} ${vehicle.model}`
-              }
-              alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-              fill
-              className="object-cover"
-            />
-            <div className="absolute top-3 right-3">
-              <Badge
-                variant={isGain ? "default" : "destructive"}
-                className={`${isGain ? "bg-gain text-white" : "bg-loss text-white"} whitespace-nowrap`}
-              >
-                {isGain ? "+" : ""}
-                {gainLossPercentage}%
-              </Badge>
-            </div>
-          </div>
+          {/* Color bar instead of image */}
+          <div className="h-3 w-full rounded-t-lg bg-gradient-to-r from-primary/60 to-primary/20" />
 
           <div className="p-4 space-y-4">
             <div>
@@ -184,29 +85,49 @@ function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="min-w-0">
-                <p className="text-muted-foreground text-xs">Current Value</p>
-                <p className="font-semibold whitespace-nowrap">€{vehicle.currentValue.toLocaleString()}</p>
+                <p className="text-muted-foreground text-xs">Market Value</p>
+                {hasValuation ? (
+                  <p className="font-semibold whitespace-nowrap">€{Math.round(currentVal).toLocaleString()}</p>
+                ) : (
+                  <p className="font-semibold text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Calculating
+                  </p>
+                )}
               </div>
               <div className="min-w-0">
-                <p className="text-muted-foreground text-xs">Original Price</p>
-                <p className="font-semibold whitespace-nowrap">€{vehicle.originalPrice.toLocaleString()}</p>
+                <p className="text-muted-foreground text-xs">Purchase Price</p>
+                <p className="font-semibold whitespace-nowrap">€{Math.round(vehicle.purchase_price).toLocaleString()}</p>
               </div>
             </div>
 
             <div className="flex items-center justify-between text-sm gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                {isGain ? <TrendingUp className="h-4 w-4 text-gain flex-shrink-0" /> : <TrendingDown className="h-4 w-4 text-loss flex-shrink-0" />}
-                <span className={`${isGain ? "text-gain" : "text-loss"} whitespace-nowrap`}>€{Math.abs(gainLoss).toLocaleString()}</span>
+                {isGain ? (
+                  <TrendingUp className="h-4 w-4 text-gain flex-shrink-0" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 text-loss flex-shrink-0" />
+                )}
+                <span className={`${isGain ? "text-gain" : "text-loss"} whitespace-nowrap`}>
+                  {isGain ? "+" : "-"}€{Math.round(Math.abs(gainLoss)).toLocaleString()}
+                </span>
+                <Badge
+                  variant={isGain ? "default" : "destructive"}
+                  className={`text-xs ${isGain ? "bg-gain text-white" : "bg-loss text-white"}`}
+                >
+                  {isGain ? "+" : ""}{gainLossPercentage}%
+                </Badge>
               </div>
-              <div className="text-muted-foreground text-xs whitespace-nowrap">{vehicle.daysOwned} days</div>
+              {daysOwned > 0 && (
+                <div className="text-muted-foreground text-xs whitespace-nowrap">{daysOwned}d owned</div>
+              )}
             </div>
 
-            {vehicle.mileage && (
-              <div className="text-xs text-muted-foreground">
-                <div className="flex justify-between items-center">
-                  <span className="whitespace-nowrap">{vehicle.mileage.toLocaleString()} miles</span>
-                  <span className="whitespace-nowrap">Updated {vehicle.lastUpdated}</span>
-                </div>
+            {(vehicle.current_mileage || vehicle.fuel_type || vehicle.transmission) && (
+              <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+                {vehicle.current_mileage && <span>{vehicle.current_mileage.toLocaleString()} km</span>}
+                {vehicle.fuel_type && <span>{vehicle.fuel_type}</span>}
+                {vehicle.transmission && <span>{vehicle.transmission}</span>}
               </div>
             )}
 
@@ -220,7 +141,12 @@ function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
                 <Eye className="h-3 w-3 mr-1" />
                 Details
               </Button>
-              <Button size="sm" variant="outline" className="flex-1 bg-transparent text-xs" onClick={handleEdit}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 bg-transparent text-xs"
+                onClick={() => setEditOpen(true)}
+              >
                 <Edit className="h-3 w-3 mr-1" />
                 Update
               </Button>
@@ -229,6 +155,7 @@ function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
                 variant="outline"
                 className="text-destructive hover:text-destructive bg-transparent px-2"
                 onClick={handleDelete}
+                disabled={isDeleting}
               >
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -237,98 +164,83 @@ function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
         </CardContent>
       </Card>
 
-      <VehicleDetailsModal open={detailsOpen} onOpenChange={setDetailsOpen} vehicle={vehicle} />
+      <VehicleDetailsModal
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        vehicle={vehicle}
+        onDelete={onDelete}
+        onRefreshValuation={onRefreshValuation}
+      />
+
+      <AddVehicleWizard
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSubmit={handleEditSubmit}
+        initialData={vehicle}
+        mode="edit"
+      />
     </>
   )
 }
 
-export function VehicleList() {
+export function VehicleList({ vehicles, onDelete, onUpdate, onRefreshValuation, onAddVehicle }: VehicleListProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedMake, setSelectedMake] = useState("all")
   const [sortBy, setSortBy] = useState("value-desc")
-  const [visibleCount, setVisibleCount] = useState(6)
-  const [addVehicleOpen, setAddVehicleOpen] = useState(false)
-  const [vehicles, setVehicles] = useState<Vehicle[]>(mockVehicles)
-  const { toast } = useToast()
+  const [visibleCount, setVisibleCount] = useState(8)
 
-  // Allow external triggers (e.g., from PortfolioSummary) to open this modal
-  useEffect(() => {
-    const handler = () => setAddVehicleOpen(true)
-    window.addEventListener("open-add-vehicle", handler)
-    return () => window.removeEventListener("open-add-vehicle", handler)
-  }, [])
+  // Dynamic make options from actual vehicles
+  const makeOptions = useMemo(() => {
+    const makes = [...new Set(vehicles.map((v) => v.make))].sort()
+    return makes
+  }, [vehicles])
 
-  const handleLoadMore = () => {
-    setVisibleCount((prev) => prev + 6)
-    toast({
-      title: "Loading More Vehicles",
-      description: "Fetching additional vehicles from your portfolio...",
+  const filteredVehicles = useMemo(() => {
+    let result = vehicles.filter((vehicle) => {
+      if (selectedMake !== "all" && vehicle.make.toLowerCase() !== selectedMake.toLowerCase()) {
+        return false
+      }
+      if (
+        searchTerm &&
+        !`${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim || ""}`.toLowerCase().includes(searchTerm.toLowerCase())
+      ) {
+        return false
+      }
+      return true
     })
-  }
 
-  const handleSearch = (value: string) => {
-    setSearchTerm(value)
-    if (value) {
-      toast({
-        title: "Searching Vehicles",
-        description: `Filtering portfolio for "${value}"...`,
-      })
-    }
-  }
+    result.sort((a, b) => {
+      const aVal = a.current_market_value ?? a.purchase_price
+      const bVal = b.current_market_value ?? b.purchase_price
+      const aGain = aVal - a.purchase_price
+      const bGain = bVal - b.purchase_price
 
-  const handleVehicleAdded = (newVehicle: any) => {
-    console.log("[v0] New vehicle added to portfolio:", newVehicle)
-    const vehicleWithDefaults = {
-      ...newVehicle,
-      image: `/placeholder.svg?height=200&width=400&query=${newVehicle.year} ${newVehicle.make} ${newVehicle.model}`,
-      currentValue: newVehicle.originalPrice, // Start with original price
-      daysOwned: Math.floor((Date.now() - new Date(newVehicle.purchaseDate).getTime()) / (1000 * 60 * 60 * 24)),
-    }
-    setVehicles((prev) => [vehicleWithDefaults, ...prev])
-    toast({
-      title: "Vehicle Added to Portfolio",
-      description: `${newVehicle.year} ${newVehicle.make} ${newVehicle.model} is now visible in your portfolio below.`,
+      switch (sortBy) {
+        case "value-desc": return bVal - aVal
+        case "value-asc": return aVal - bVal
+        case "gain-desc": return bGain - aGain
+        case "gain-asc": return aGain - bGain
+        case "date-desc": return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        case "date-asc": return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        default: return 0
+      }
     })
-  }
 
-  const filteredVehicles = vehicles.filter((vehicle) => {
-    if (selectedMake !== "all" && vehicle.make.toLowerCase() !== selectedMake.toLowerCase()) {
-      return false
-    }
-    if (
-      searchTerm &&
-      !`${vehicle.year} ${vehicle.make} ${vehicle.model}`.toLowerCase().includes(searchTerm.toLowerCase())
-    ) {
-      return false
-    }
-    return true
-  })
-
-  const sortedVehicles = filteredVehicles.sort((a, b) => {
-    switch (sortBy) {
-      case "value-desc":
-        return b.currentValue - a.currentValue
-      case "value-asc":
-        return a.currentValue - b.currentValue
-      case "gain-desc":
-        return b.currentValue - b.originalPrice - (a.currentValue - a.originalPrice)
-      case "gain-asc":
-        return a.currentValue - a.originalPrice - (b.currentValue - b.originalPrice)
-      case "date-desc":
-        return new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
-      case "date-asc":
-        return new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime()
-      default:
-        return 0
-    }
-  })
+    return result
+  }, [vehicles, selectedMake, searchTerm, sortBy])
 
   return (
     <div className="space-y-4">
-      {/* Header with Search and Filters - Removed duplicate Add Vehicle button */}
+      {/* Header with Search and Filters */}
       <Card className="border-border/50">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold">Portfolio Vehicles</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-semibold">Portfolio Vehicles</CardTitle>
+            <Button size="sm" onClick={onAddVehicle}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Vehicle
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="flex flex-col sm:flex-row gap-4">
@@ -338,7 +250,7 @@ export function VehicleList() {
                 placeholder="Search vehicles..."
                 className="pl-10"
                 value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <div className="flex gap-2">
@@ -349,12 +261,9 @@ export function VehicleList() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Makes</SelectItem>
-                  <SelectItem value="bmw">BMW</SelectItem>
-                  <SelectItem value="porsche">Porsche</SelectItem>
-                  <SelectItem value="tesla">Tesla</SelectItem>
-                  <SelectItem value="mercedes">Mercedes</SelectItem>
-                  <SelectItem value="audi">Audi</SelectItem>
-                  <SelectItem value="lamborghini">Lamborghini</SelectItem>
+                  {makeOptions.map((make) => (
+                    <SelectItem key={make} value={make.toLowerCase()}>{make}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -377,22 +286,32 @@ export function VehicleList() {
       </Card>
 
       {/* Vehicle Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {sortedVehicles.slice(0, visibleCount).map((vehicle) => (
-          <VehicleCard key={vehicle.id} vehicle={vehicle} />
-        ))}
-      </div>
-
-      {/* Load More */}
-      {visibleCount < sortedVehicles.length && (
-        <div className="flex justify-center pt-4">
-          <Button variant="outline" size="lg" onClick={handleLoadMore}>
-            Load More Vehicles ({sortedVehicles.length - visibleCount} remaining)
-          </Button>
+      {filteredVehicles.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredVehicles.slice(0, visibleCount).map((vehicle) => (
+            <VehicleCard
+              key={vehicle.id}
+              vehicle={vehicle}
+              onDelete={onDelete}
+              onUpdate={onUpdate}
+              onRefreshValuation={onRefreshValuation}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 text-muted-foreground">
+          <p className="text-sm">No vehicles match your search.</p>
         </div>
       )}
 
-      <SimpleAddVehicleModal open={addVehicleOpen} onOpenChange={setAddVehicleOpen} onVehicleAdded={handleVehicleAdded} />
+      {/* Load More */}
+      {visibleCount < filteredVehicles.length && (
+        <div className="flex justify-center pt-4">
+          <Button variant="outline" size="lg" onClick={() => setVisibleCount((prev) => prev + 8)}>
+            Load More ({filteredVehicles.length - visibleCount} remaining)
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

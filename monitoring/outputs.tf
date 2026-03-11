@@ -12,3 +12,8 @@ output "portal_logs_url" {
   description = "Direct link to view logs in Azure Portal"
   value       = "https://portal.azure.com/#blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/${urlencode(azurerm_log_analytics_workspace.monitoring.id)}"
 }
+
+output "valuation_api_url" {
+  description = "CARMA Valuation API URL"
+  value       = "https://${azurerm_container_app.valuation.ingress[0].fqdn}"
+}

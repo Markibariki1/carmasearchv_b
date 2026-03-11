@@ -22,3 +22,15 @@ variable "vm_name" {
   description = "Name of the Ubuntu VM"
   type        = string
 }
+
+variable "valuation_image_tag" {
+  description = "Docker image tag for the valuation API"
+  type        = string
+  default     = "v1.0"
+}
+
+variable "database_password" {
+  description = "PostgreSQL database password"
+  type        = string
+  sensitive   = true
+}

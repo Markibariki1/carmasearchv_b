@@ -1,4 +1,4 @@
-# CARMA Comparison API — speed-critical vehicle comparison & ranking
+# CARMA Valuation API — accuracy-critical market value estimation
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -28,5 +28,5 @@ EXPOSE 8000
 
 ENV PYTHONPATH=/app
 
-# Run the comparison API
-CMD ["gunicorn", "-w", "2", "--threads", "4", "-b", "0.0.0.0:8000", "--timeout", "60", "--keep-alive", "5", "src.api:app"]
+# Run the valuation API (120s timeout for long-running queries)
+CMD ["gunicorn", "-w", "2", "--threads", "4", "-b", "0.0.0.0:8000", "--timeout", "120", "--keep-alive", "5", "src.valuation_api:app"]

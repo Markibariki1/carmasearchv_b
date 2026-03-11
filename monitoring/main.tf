@@ -116,3 +116,96 @@ resource "azurerm_monitor_data_collection_rule_association" "vm" {
   target_resource_id      = data.azurerm_virtual_machine.vm.id
   data_collection_rule_id = azurerm_monitor_data_collection_rule.vm.id
 }
+
+# -------------------------------------------------------
+# Valuation API — separate Container App
+# -------------------------------------------------------
+
+data "azurerm_container_app_environment" "env" {
+  name                = "carma-environment"
+  resource_group_name = var.resource_group_name
+}
+
+data "azurerm_container_registry" "acr" {
+  name                = "carmaregistry"
+  resource_group_name = var.resource_group_name
+}
+
+resource "azurerm_container_app" "valuation" {
+  name                         = "carma-valuation-api"
+  container_app_environment_id = data.azurerm_container_app_environment.env.id
+  resource_group_name          = var.resource_group_name
+  revision_mode                = "Single"
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  registry {
+    server   = "${data.azurerm_container_registry.acr.name}.azurecr.io"
+    identity = "System"
+  }
+
+  template {
+    container {
+      name   = "valuation-api"
+      image  = "${data.azurerm_container_registry.acr.name}.azurecr.io/carma-valuation-api:${var.valuation_image_tag}"
+      cpu    = 0.5
+      memory = "1Gi"
+
+      env {
+        name  = "DATABASE_HOST"
+        value = "carma.postgres.database.azure.com"
+      }
+      env {
+        name  = "DATABASE_PORT"
+        value = "5432"
+      }
+      env {
+        name  = "DATABASE_USER"
+        value = "carmaadmin"
+      }
+      env {
+        name        = "DATABASE_PASSWORD"
+        secret_name = "db-password"
+      }
+      env {
+        name  = "DATABASE_NAME"
+        value = "postgres"
+      }
+      env {
+        name  = "DB_MIN_CONN"
+        value = "1"
+      }
+      env {
+        name  = "DB_MAX_CONN"
+        value = "5"
+      }
+    }
+
+    min_replicas = 0
+    max_replicas = 2
+  }
+
+  secret {
+    name  = "db-password"
+    value = var.database_password
+  }
+
+  ingress {
+    external_enabled = true
+    target_port      = 8000
+    transport        = "auto"
+
+    traffic_weight {
+      latest_revision = true
+      percentage      = 100
+    }
+  }
+}
+
+resource "azurerm_role_assignment" "valuation_acr_pull" {
+  scope                = data.azurerm_container_registry.acr.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_container_app.valuation.identity[0].principal_id
+}
