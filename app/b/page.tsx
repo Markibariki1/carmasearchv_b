@@ -743,11 +743,11 @@ export default function HomePageB() {
           <LogoScrollWheel
             invert={false}
             logos={[
-              { src: '/AutoScout24_primary_solid.png', alt: 'AutoScout24', href: 'https://www.autoscout24.de' },
-              { src: '/AutoTrader_logo.svg.png', alt: 'AutoTrader', href: 'https://www.autotrader.com' },
-              { src: '/Logo_von_mobile.de_2025-05.svg.png', alt: 'Mobile.de', href: 'https://www.mobile.de' },
-              { src: '/Marktplaats.nl-Logo.wine.png', alt: 'Marktplaats', href: 'https://www.marktplaats.nl' },
-              { src: '/otomoto_logotyp.png', alt: 'Otomoto', href: 'https://www.otomoto.pl' },
+              { src: '/AutoScout24_primary_solid.png', alt: 'AutoScout24', href: 'https://www.autoscout24.de', heightClass: 'h-10' },
+              { src: '/AutoTrader_logo.svg.png', alt: 'AutoTrader', href: 'https://www.autotrader.com', heightClass: 'h-8' },
+              { src: '/Logo_von_mobile.de_2025-05.svg.png', alt: 'Mobile.de', href: 'https://www.mobile.de', heightClass: 'h-10' },
+              { src: '/Marktplaats.nl-Logo.wine.png', alt: 'Marktplaats', href: 'https://www.marktplaats.nl', heightClass: 'h-16' },
+              { src: '/otomoto_logotyp.png', alt: 'Otomoto', href: 'https://www.otomoto.pl', heightClass: 'h-10' },
             ]}
           />
         </div>

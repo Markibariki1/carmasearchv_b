@@ -3,59 +3,69 @@
 
 import { useMemo } from 'react'
 
+interface LogoItem {
+  src: string
+  alt: string
+  href?: string
+  /** Tailwind h-* class to override default logo height, e.g. "h-8" or "h-14" */
+  heightClass?: string
+}
+
 interface LogoScrollWheelProps {
-  logos: Array<{ src: string; alt: string; href?: string }>
+  logos: LogoItem[]
   invert?: boolean
 }
+
+// 4 copies ensures the seam is always off-screen regardless of viewport width
+const COPIES = 4
 
 export function LogoScrollWheel({ logos, invert = true }: LogoScrollWheelProps) {
   const marqueeItems = useMemo(() => {
     if (!logos || logos.length === 0) return []
-    // Duplicate array so the animation can loop seamlessly.
-    return [...logos, ...logos]
+    return Array.from({ length: COPIES }, () => logos).flat()
   }, [logos])
+
+  const translateEnd = `-${(100 / COPIES).toFixed(4)}%`
 
   return (
     <div className="overflow-hidden py-8">
       <div
-        className="flex gap-8"
+        className="flex items-center gap-12"
         style={{
           width: 'max-content',
-          animation: 'carma-marquee 25s linear infinite',
+          animation: `carma-marquee 30s linear infinite`,
+          ['--translate-end' as string]: translateEnd,
         }}
       >
-        {marqueeItems.map((logo, index) => (
-          <div
-            key={`${logo.src}-${index}`}
-            className="flex-shrink-0 flex items-center justify-center w-32 h-10 opacity-60 hover:opacity-100 transition-opacity duration-300"
-          >
-            {logo.href ? (
-              <a href={logo.href} target="_blank" rel="noopener noreferrer" className="w-full h-full flex items-center justify-center">
-                <img
-                  src={logo.src}
-                  alt={logo.alt}
-                  className={`max-w-full max-h-full w-auto h-auto object-contain ${invert ? "filter brightness-0 invert" : ""}`}
-                />
-              </a>
-            ) : (
-              <img
-                src={logo.src}
-                alt={logo.alt}
-                className={`max-w-full max-h-full w-auto h-auto object-contain ${invert ? "filter brightness-0 invert" : ""}`}
-              />
-            )}
-          </div>
-        ))}
+        {marqueeItems.map((logo, index) => {
+          const heightClass = logo.heightClass ?? 'h-10'
+          const img = (
+            <img
+              src={logo.src}
+              alt={logo.alt}
+              className={`w-auto ${heightClass} object-contain ${invert ? 'filter brightness-0 invert' : ''}`}
+            />
+          )
+
+          return (
+            <div
+              key={`${logo.src}-${index}`}
+              className="flex-shrink-0 flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity duration-300"
+            >
+              {logo.href ? (
+                <a href={logo.href} target="_blank" rel="noopener noreferrer">
+                  {img}
+                </a>
+              ) : img}
+            </div>
+          )
+        })}
       </div>
 
       <style jsx global>{`
         @keyframes carma-marquee {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(var(--translate-end)); }
         }
       `}</style>
     </div>
