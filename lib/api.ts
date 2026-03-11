@@ -304,9 +304,17 @@ export async function getComparableVehicles(
   vehicleId: string,
   top: number = 10,
   signal?: AbortSignal,
+  filters?: SearchFilters,
 ): Promise<ComparablesResponse> {
   return retryApiCall(async () => {
-    const response = await fetch(`${API_BASE}/listings/${vehicleId}/comparables?top=${top}`, { signal });
+    const params = new URLSearchParams({ top: String(top) });
+    if (filters?.colors?.length)         params.set("colors", filters.colors.join(","));
+    if (filters?.interiorColors?.length) params.set("interior_colors", filters.interiorColors.join(","));
+    if (filters?.yearFrom)               params.set("year_from", filters.yearFrom);
+    if (filters?.yearUntil)              params.set("year_until", filters.yearUntil);
+    if (filters?.mileageFrom)            params.set("mileage_from", filters.mileageFrom);
+    if (filters?.mileageUntil)           params.set("mileage_until", filters.mileageUntil);
+    const response = await fetch(`${API_BASE}/listings/${vehicleId}/comparables?${params}`, { signal });
     if (!response.ok) {
       if (response.status === 404) {
         throw new Error('No comparable vehicles found for this vehicle.');
@@ -385,9 +393,19 @@ export class ApiHealthMonitor {
 }
 
 // Main comparison function
+export interface SearchFilters {
+  colors?: string[];          // color_norm values e.g. ["black", "white"]
+  interiorColors?: string[];  // interior color labels e.g. ["black", "beige"]
+  yearFrom?: string;
+  yearUntil?: string;
+  mileageFrom?: string;
+  mileageUntil?: string;
+}
+
 interface CompareOptions {
   top?: number;
   signal?: AbortSignal;
+  filters?: SearchFilters;
 }
 
 export async function compareVehicle(input: string, options?: CompareOptions): Promise<ComparablesResponse> {
@@ -399,9 +417,10 @@ export async function compareVehicle(input: string, options?: CompareOptions): P
 
   const top = options?.top ?? 12;
   const signal = options?.signal;
+  const filters = options?.filters;
 
   try {
-    const response = await getComparableVehicles(vehicleId, top, signal);
+    const response = await getComparableVehicles(vehicleId, top, signal, filters);
     return response;
   } catch (error) {
     if (error instanceof Error) {

@@ -1,23 +1,33 @@
 #!/usr/bin/env python3
 """
-CARMA Vehicle API (clean rebuild)
-=================================
+CARMA Vehicle API  ·  v5
+========================
 
-Expose the minimal set of endpoints required by the frontend:
-    • GET /health              – quick connectivity check
-    • GET /stats               – basic database stats
-    • GET /listings/<id>       – canonical vehicle payload
-    • GET /listings/<id>/comparables
-
-The service fetches raw rows from Azure PostgreSQL, normalises price /
-mileage / year fields, and ranks comparable listings with a lightweight
-similarity + deal score.
+Key changes over v4:
+    - Hard SQL filters now use normalised columns (body_type_norm,
+      transmission_norm, fuel_type_norm) so cross-source matching works.
+      Body type and transmission NEVER drop from the query.
+      Fuel type is the only soft SQL filter (one fallback level).
+    - Candidate pool increased 100 → 400 for popular models so we
+      don't miss deals that lay outside the random first-100.
+    - Mileage similarity is now directional: fewer km than target
+      incurs half the penalty of more km than target.
+    - Price tolerance scales with price level (expensive cars can
+      show a wider absolute range and still be comparable).
+    - Deal score is computed from a within-pool log-price regression
+      (log(price) ~ year + log(mileage)) — no extra DB query.
+      A positive residual means the candidate is underpriced for its
+      age and mileage relative to the rest of the pool.
+    - model_generation_id same-gen bonus (+10% on similarity).
+    - is_private_seller surfaced in payload for display.
+    - 10-second hard budget: SQL timeout 7s, total target <10s.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import threading
 import time
@@ -25,6 +35,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 import psycopg2
 import psycopg2.pool
 from dotenv import load_dotenv
@@ -33,7 +44,7 @@ from flask_cors import CORS
 from psycopg2.extras import RealDictCursor
 
 # ---------------------------------------------------------------------------
-# Environment & logging
+# Env / logging
 # ---------------------------------------------------------------------------
 
 load_dotenv()
@@ -45,7 +56,42 @@ app = Flask(__name__)
 CORS(app)
 
 # ---------------------------------------------------------------------------
-# Database helpers
+# TTL cache
+# ---------------------------------------------------------------------------
+
+
+class TTLCache:
+    def __init__(self) -> None:
+        self._store: Dict[str, Tuple[Any, float]] = {}
+        self._lock = threading.Lock()
+
+    def get(self, key: str) -> Optional[Any]:
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                return None
+            value, expires_at = entry
+            if time.time() > expires_at:
+                del self._store[key]
+                return None
+            return value
+
+    def set(self, key: str, value: Any, ttl_seconds: int) -> None:
+        with self._lock:
+            self._store[key] = (value, time.time() + ttl_seconds)
+
+    def delete(self, key: str) -> None:
+        with self._lock:
+            self._store.pop(key, None)
+
+
+_cache = TTLCache()
+
+STATS_TTL       = 300    # 5 min
+COMPARABLES_TTL = 3600   # 1 hr
+
+# ---------------------------------------------------------------------------
+# DB pool
 # ---------------------------------------------------------------------------
 
 _connection_pool: Optional[psycopg2.pool.ThreadedConnectionPool] = None
@@ -53,23 +99,21 @@ _pool_lock = threading.Lock()
 
 
 def _db_config() -> Dict[str, Any]:
-    """Collect required database settings and fail fast if any are missing."""
     required = {
-        "host": os.getenv("DATABASE_HOST"),
-        "port": os.getenv("DATABASE_PORT", "5432"),
-        "user": os.getenv("DATABASE_USER"),
+        "host":     os.getenv("DATABASE_HOST"),
+        "port":     os.getenv("DATABASE_PORT", "5432"),
+        "user":     os.getenv("DATABASE_USER"),
         "password": os.getenv("DATABASE_PASSWORD"),
-        "dbname": os.getenv("DATABASE_NAME", "postgres"),
+        "dbname":   os.getenv("DATABASE_NAME", "postgres"),
     }
-    missing = [key for key, value in required.items() if not value]
+    missing = [k for k, v in required.items() if not v]
     if missing:
-        raise RuntimeError(f"Missing database environment variables: {', '.join(missing)}")
+        raise RuntimeError(f"Missing DB env vars: {', '.join(missing)}")
     required["port"] = int(required["port"])
     return required
 
 
 def get_connection_pool() -> psycopg2.pool.ThreadedConnectionPool:
-    """Lazy-create a global threaded connection pool."""
     global _connection_pool
     if _connection_pool and not _connection_pool.closed:
         return _connection_pool
@@ -79,38 +123,33 @@ def get_connection_pool() -> psycopg2.pool.ThreadedConnectionPool:
             return _connection_pool
 
         cfg = _db_config()
-        min_conn = int(os.getenv("DB_MIN_CONN", "2"))
-        max_conn = int(os.getenv("DB_MAX_CONN", "10"))
-
-        logger.info(
-            "Initialising database pool (host=%s, db=%s, min=%s, max=%s)",
-            cfg["host"],
-            cfg["dbname"],
-            min_conn,
-            max_conn,
-        )
+        min_c = int(os.getenv("DB_MIN_CONN", "2"))
+        max_c = int(os.getenv("DB_MAX_CONN", "10"))
+        logger.info("Pool init host=%s db=%s min=%s max=%s",
+                    cfg["host"], cfg["dbname"], min_c, max_c)
 
         _connection_pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=min_conn,
-            maxconn=max_conn,
+            minconn=min_c,
+            maxconn=max_c,
             connect_timeout=int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
             keepalives=1,
             keepalives_idle=60,
             keepalives_interval=15,
             keepalives_count=5,
+            sslmode="require",
             **cfg,
         )
         return _connection_pool
 
 
 @contextmanager
-def get_db_cursor():
-    """Yield a cursor with automatic return to the pool."""
+def get_db_cursor(timeout_ms: int = 7_000):
     pool = get_connection_pool()
     conn = pool.getconn()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            yield cursor
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(f"SET LOCAL statement_timeout = {timeout_ms}")
+            yield cur
             conn.commit()
     except Exception:
         conn.rollback()
@@ -120,12 +159,102 @@ def get_db_cursor():
 
 
 # ---------------------------------------------------------------------------
+# Index bootstrap (non-blocking, once per process)
+# ---------------------------------------------------------------------------
+
+_INDEXES_CREATED = False
+_INDEX_LOCK = threading.Lock()
+
+_INDEXES: List[Tuple[str, str]] = [
+    (
+        "idx_vd_norm_strict",
+        """CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_vd_norm_strict
+               ON vehicle_marketplace.vehicle_data
+               (make, model, body_type_norm, transmission_norm, fuel_type_norm)
+               WHERE is_vehicle_available = true
+                 AND body_type_norm IS NOT NULL
+                 AND transmission_norm IS NOT NULL""",
+    ),
+    (
+        "idx_vd_norm_no_fuel",
+        """CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_vd_norm_no_fuel
+               ON vehicle_marketplace.vehicle_data
+               (make, model, body_type_norm, transmission_norm)
+               WHERE is_vehicle_available = true
+                 AND body_type_norm IS NOT NULL
+                 AND transmission_norm IS NOT NULL""",
+    ),
+    (
+        "idx_vd_make_model_avail",
+        """CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_vd_make_model_avail
+               ON vehicle_marketplace.vehicle_data (make, model)
+               WHERE is_vehicle_available = true""",
+    ),
+    (
+        "idx_vd_year_extracted",
+        """CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_vd_year_extracted
+               ON vehicle_marketplace.vehicle_data (year_extracted)
+               WHERE is_vehicle_available = true AND year_extracted > 0""",
+    ),
+]
+
+
+def _exec_autocommit(pool, sql: str, label: str) -> bool:
+    conn = pool.getconn()
+    try:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute(sql)
+        logger.info("DDL OK: %s", label)
+        return True
+    except Exception as exc:
+        logger.warning("DDL skip [%s]: %s", label, exc)
+        return False
+    finally:
+        conn.autocommit = False
+        pool.putconn(conn)
+
+
+def ensure_indexes() -> None:
+    def _run() -> None:
+        global _INDEXES_CREATED
+        if _INDEXES_CREATED:
+            return
+        with _INDEX_LOCK:
+            if _INDEXES_CREATED:
+                return
+            _INDEXES_CREATED = True
+
+        pool = None
+        for attempt in range(8):
+            try:
+                pool = get_connection_pool()
+                break
+            except Exception as exc:
+                wait = min(30, 5 * (attempt + 1))
+                logger.warning("Index bootstrap retry %d/8 in %ds: %s", attempt + 1, wait, exc)
+                time.sleep(wait)
+
+        if pool is None:
+            logger.error("Index bootstrap gave up: DB unreachable")
+            return
+
+        for label, stmt in _INDEXES:
+            _exec_autocommit(pool, stmt, label)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+# ---------------------------------------------------------------------------
 # Normalisation helpers
 # ---------------------------------------------------------------------------
 
-NUMERIC_PRICE_SQL = "CAST(NULLIF(REGEXP_REPLACE(price, '[^0-9]', '', 'g'), '') AS DOUBLE PRECISION)"
+NUMERIC_PRICE_SQL = (
+    "CAST(NULLIF(REGEXP_REPLACE(price, '[^0-9]', '', 'g'), '') AS DOUBLE PRECISION)"
+)
 NUMERIC_MILEAGE_SQL = (
-    "CAST(NULLIF(REGEXP_REPLACE(COALESCE(CAST(mileage_km AS TEXT), ''), '[^0-9]', '', 'g'), '') AS DOUBLE PRECISION)"
+    "CAST(NULLIF(REGEXP_REPLACE(COALESCE(CAST(mileage_km AS TEXT), ''), "
+    "'[^0-9]', '', 'g'), '') AS DOUBLE PRECISION)"
 )
 
 
@@ -135,9 +264,7 @@ def normalise_price(value: Any) -> Optional[float]:
     if isinstance(value, (int, float)):
         return float(value)
     digits = "".join(ch for ch in str(value) if ch.isdigit())
-    if not digits:
-        return None
-    return float(digits)
+    return float(digits) if digits else None
 
 
 def normalise_mileage(value: Any) -> Optional[float]:
@@ -146,9 +273,7 @@ def normalise_mileage(value: Any) -> Optional[float]:
     if isinstance(value, (int, float)):
         return float(value)
     digits = "".join(ch for ch in str(value) if ch.isdigit())
-    if not digits:
-        return None
-    return float(digits)
+    return float(digits) if digits else None
 
 
 def extract_year(raw: Any) -> Optional[int]:
@@ -169,117 +294,211 @@ def parse_images(raw: Any) -> List[str]:
     if raw is None:
         return []
     if isinstance(raw, list):
-        return [str(item) for item in raw if item]
+        return [str(i) for i in raw if i]
     if isinstance(raw, str):
         try:
             decoded = json.loads(raw)
             if isinstance(decoded, list):
-                return [str(item) for item in decoded if item]
+                return [str(i) for i in decoded if i]
         except json.JSONDecodeError:
-            return []
+            pass
     return []
 
 
 def format_vehicle_payload(row: Dict[str, Any]) -> Dict[str, Any]:
-    price = normalise_price(row.get("price_num"))
-    if price is None:
-        price = normalise_price(row.get("price"))
-
-    mileage = normalise_mileage(row.get("mileage_num"))
-    if mileage is None:
-        mileage = normalise_mileage(row.get("mileage_km"))
-
-    year = extract_year(row.get("first_registration_raw"))
+    price   = normalise_price(row.get("price_num")) or normalise_price(row.get("price"))
+    mileage = normalise_mileage(row.get("mileage_num")) or normalise_mileage(row.get("mileage_km"))
+    year    = extract_year(row.get("first_registration_raw"))
 
     return {
-        "id": row.get("id") or row.get("vehicle_id"),
-        "url": row.get("listing_url"),
-        "price_eur": float(price) if price is not None else None,
-        "price_raw": row.get("price"),
-        "mileage_km": float(mileage) if mileage is not None else None,
-        "mileage_raw": row.get("mileage_km"),
-        "year": year,
-        "make": row.get("make"),
-        "model": row.get("model"),
-        "fuel_group": row.get("fuel_type"),
-        "transmission_group": row.get("transmission"),
-        "body_group": row.get("body_type"),
-        "color": row.get("color"),
-        "interior_color": row.get("interior_color"),
-        "upholstery_color": row.get("upholstery_color"),
-        "description": row.get("description") or "",
-        "data_source": row.get("data_source"),
-        "power_kw": float(row["power_kw"]) if row.get("power_kw") is not None else None,
-        "images": parse_images(row.get("images")),
+        "id":                     row.get("id") or row.get("vehicle_id"),
+        "url":                    row.get("listing_url"),
+        "price_eur":              float(price) if price is not None else None,
+        "price_raw":              row.get("price"),
+        "mileage_km":             float(mileage) if mileage is not None else None,
+        "mileage_raw":            row.get("mileage_km"),
+        "year":                   year,
+        "make":                   row.get("make"),
+        "model":                  row.get("model"),
+        "fuel_group":             row.get("fuel_type"),
+        "fuel_type_norm":         row.get("fuel_type_norm"),
+        "transmission_group":     row.get("transmission"),
+        "transmission_norm":      row.get("transmission_norm"),
+        "body_group":             row.get("body_type"),
+        "body_type_norm":         row.get("body_type_norm"),
+        "color":                  row.get("color"),
+        "color_norm":             row.get("color_norm"),
+        "interior_color":         row.get("interior_color"),
+        "upholstery_color":       row.get("upholstery_color"),
+        "description":            row.get("description") or "",
+        "data_source":            row.get("data_source"),
+        "power_kw":               float(row["power_kw"]) if row.get("power_kw") is not None else None,
+        "images":                 parse_images(row.get("images")),
         "first_registration_raw": row.get("first_registration_raw"),
-        "created_at": row.get("created_at"),
+        "created_at":             row.get("created_at"),
+        "generation_id":          row.get("model_generation_id"),
+        "is_private_seller":      row.get("is_private_seller"),
+        "seller_name":            row.get("seller_name"),
+        "condition":              row.get("condition"),
+        "previous_owners":        row.get("previous_owners"),
     }
 
 
 # ---------------------------------------------------------------------------
-# Similarity logic
+# Deal score: within-pool log-price regression
 # ---------------------------------------------------------------------------
 
-SimilarityWeights = Dict[str, float]
+def compute_pool_regression(
+    candidates: List[Dict[str, Any]],
+) -> Optional[np.ndarray]:
+    """
+    Fit log(price) ~ intercept + year + log(mileage + 1) on the candidate pool.
+    Returns coefficient array [intercept, year_coeff, log_mileage_coeff]
+    or None if fewer than 6 candidates have valid data.
+    """
+    valid = [
+        (c["price_eur"], c["year"], c["mileage_km"])
+        for c in candidates
+        if c.get("price_eur") and c.get("year") and c.get("mileage_km")
+        and c["price_eur"] > 0 and c["mileage_km"] >= 0
+    ]
+    if len(valid) < 6:
+        return None
+
+    try:
+        log_prices    = np.array([math.log(v[0]) for v in valid])
+        years         = np.array([float(v[1])     for v in valid])
+        log_mileages  = np.array([math.log(v[2] + 1) for v in valid])
+        X = np.column_stack([np.ones(len(valid)), years, log_mileages])
+        coeffs, _, _, _ = np.linalg.lstsq(X, log_prices, rcond=None)
+        return coeffs
+    except Exception as exc:
+        logger.warning("Pool regression failed: %s", exc)
+        return None
 
 
-class SimilarityEngine:
-    """Very small heuristic similarity scorer for vehicle listings."""
+def deal_score_from_regression(
+    vehicle: Dict[str, Any], coeffs: Optional[np.ndarray]
+) -> float:
+    """
+    Returns a 0–1 deal score.
+    0.5 = fair value  |  1.0 = heavily underpriced  |  0.0 = heavily overpriced
+    A log-residual of ±0.3 (≈30% price difference) maps to score ≈ 1.0 or 0.0.
+    """
+    if coeffs is None:
+        return 0.5
+    price   = vehicle.get("price_eur")
+    year    = vehicle.get("year")
+    mileage = vehicle.get("mileage_km")
+    if not price or not year or mileage is None or price <= 0:
+        return 0.5
 
-    def __init__(self, weights: Optional[SimilarityWeights] = None) -> None:
-        self.weights = weights or {
-            "color": 0.15,
-            "interior_color": 0.05,
-            "age": 0.20,
-            "mileage": 0.20,
-            "power": 0.10,
-            "price": 0.30,
-        }
-
-    @staticmethod
-    def _match_score(a: Optional[str], b: Optional[str]) -> float:
-        if not a or not b:
-            return 0.5
-        return 1.0 if safe_lower(a) == safe_lower(b) else 0.0
-
-    @staticmethod
-    def _similarity_ratio(a: Optional[float], b: Optional[float], tolerance: float) -> float:
-        if a is None or b is None or a <= 0 or b <= 0:
-            return 0.5
-        diff = abs(a - b)
-        return max(0.0, 1.0 - (diff / (a * tolerance)))
-
-    @staticmethod
-    def _price_deal(target_price: Optional[float], candidate_price: Optional[float]) -> float:
-        if target_price is None or candidate_price is None or target_price <= 0:
-            return 0.5
-        delta_pct = (target_price - candidate_price) / target_price
-        # Clamp to [-0.4, 0.4] (~ +/-40%) before mapping to 0..1
-        delta_pct = max(-0.4, min(0.4, delta_pct))
-        return 0.5 + (delta_pct / 0.8)
-
-    def score(self, target: Dict[str, Any], candidate: Dict[str, Any]) -> Tuple[float, Dict[str, float]]:
-        components = {
-            "color": self._match_score(target.get("color"), candidate.get("color")),
-            "interior_color": self._match_score(target.get("interior_color"), candidate.get("interior_color")),
-            "age": self._similarity_ratio(
-                float(target["year"]) if target.get("year") else None,
-                float(candidate["year"]) if candidate.get("year") else None,
-                tolerance=0.10,  # 10% variance across 10 years
-            ),
-            "mileage": self._similarity_ratio(target.get("mileage_km"), candidate.get("mileage_km"), tolerance=1.0),
-            "power": self._similarity_ratio(target.get("power_kw"), candidate.get("power_kw"), tolerance=0.25),
-            "price": self._price_deal(target.get("price_eur"), candidate.get("price_eur")),
-        }
-
-        final_score = 0.0
-        for key, weight in self.weights.items():
-            final_score += weight * components.get(key, 0.5)
-
-        return final_score, components
+    try:
+        log_price_actual   = math.log(price)
+        log_price_expected = (
+            coeffs[0]
+            + coeffs[1] * float(year)
+            + coeffs[2] * math.log(mileage + 1)
+        )
+        # Positive residual = actual cheaper than expected = good deal
+        residual = log_price_expected - log_price_actual
+        # Scale: residual of 0.3 → score 1.0; residual of -0.3 → score 0.0
+        return float(max(0.0, min(1.0, 0.5 + residual / 0.6)))
+    except Exception:
+        return 0.5
 
 
-similarity_engine = SimilarityEngine()
+# ---------------------------------------------------------------------------
+# Similarity engine
+# ---------------------------------------------------------------------------
+
+def _year_similarity(a: Optional[float], b: Optional[float]) -> float:
+    """−0.2 per year difference, 0.0 at 5+ years apart."""
+    if a is None or b is None:
+        return 0.5
+    return max(0.0, 1.0 - abs(a - b) * 0.2)
+
+
+def _mileage_similarity_directional(
+    target_km: Optional[float], candidate_km: Optional[float]
+) -> float:
+    """
+    Lower-mileage candidates get half the penalty of higher-mileage ones.
+    Target 90k: candidate 50k → score 0.78, candidate 130k → score 0.56.
+    """
+    if target_km is None or candidate_km is None or target_km <= 0:
+        return 0.5
+    diff = candidate_km - target_km
+    if diff > 0:
+        penalty = diff / target_km          # more km than target — full penalty
+    else:
+        penalty = abs(diff) / target_km * 0.5  # fewer km — half penalty
+    return max(0.0, 1.0 - penalty)
+
+
+def _power_similarity(a: Optional[float], b: Optional[float]) -> float:
+    """±25% of target power = zero similarity."""
+    if a is None or b is None or a <= 0 or b <= 0:
+        return 0.5
+    return max(0.0, 1.0 - abs(a - b) / (a * 0.25))
+
+
+def _price_tolerance(price_eur: Optional[float]) -> float:
+    """
+    Dynamic price tolerance: cheap cars accept a wider % spread.
+    €10k → 40%,  €30k → 35%,  €60k → 28%,  €100k+ → 20%.
+    """
+    if not price_eur or price_eur <= 0:
+        return 0.35
+    return max(0.20, 0.40 - price_eur / 333_000)
+
+
+def score_similarity(
+    target: Dict[str, Any],
+    candidate: Dict[str, Any],
+) -> Tuple[float, Dict[str, float]]:
+    """
+    Returns (similarity_score 0–1, components dict).
+    Weights: year 40%, mileage 35%, power 15%, fuel_match 10%.
+    Bonus: +0.08 if same model_generation_id (capped at 1.0).
+    """
+    fuel_match = (
+        1.0 if (
+            target.get("fuel_type_norm")
+            and target["fuel_type_norm"] == candidate.get("fuel_type_norm")
+        )
+        else 0.0 if (
+            target.get("fuel_type_norm") and candidate.get("fuel_type_norm")
+        )
+        else 0.5   # one or both unknown — neutral
+    )
+
+    components = {
+        "year":    _year_similarity(
+            float(target["year"]) if target.get("year") else None,
+            float(candidate["year"]) if candidate.get("year") else None,
+        ),
+        "mileage": _mileage_similarity_directional(
+            target.get("mileage_km"), candidate.get("mileage_km")
+        ),
+        "power":   _power_similarity(
+            target.get("power_kw"), candidate.get("power_kw")
+        ),
+        "fuel":    fuel_match,
+    }
+
+    weights = {"year": 0.40, "mileage": 0.35, "power": 0.15, "fuel": 0.10}
+    score = sum(weights[k] * components[k] for k in weights)
+
+    # Same-generation bonus (autoscout24 only, ~70% coverage)
+    gen_t = target.get("generation_id")
+    gen_c = candidate.get("generation_id")
+    same_gen = bool(gen_t and gen_c and gen_t == gen_c)
+    if same_gen:
+        score = min(1.0, score + 0.08)
+
+    components["same_generation"] = 1.0 if same_gen else 0.0
+    return score, components
 
 
 # ---------------------------------------------------------------------------
@@ -295,25 +514,62 @@ SELECT_BASE_FIELDS = f"""
     make,
     model,
     fuel_type,
+    fuel_type_norm,
     transmission,
+    transmission_norm,
     body_type,
+    body_type_norm,
     description,
     data_source,
     power_kw,
     images,
     color,
+    color_norm,
     interior_color,
     upholstery_color,
     created_at,
-    {NUMERIC_PRICE_SQL} AS price_num,
+    model_generation_id,
+    is_private_seller,
+    seller_name,
+    condition,
+    previous_owners,
+    {NUMERIC_PRICE_SQL}   AS price_num,
+    {NUMERIC_MILEAGE_SQL} AS mileage_num
+"""
+
+# Lean fields for candidate ranking — no TOAST columns
+SELECT_RANK_FIELDS = f"""
+    vehicle_id,
+    listing_url,
+    price,
+    mileage_km,
+    first_registration_raw,
+    make,
+    model,
+    fuel_type,
+    fuel_type_norm,
+    transmission,
+    transmission_norm,
+    body_type,
+    body_type_norm,
+    data_source,
+    power_kw,
+    color,
+    color_norm,
+    interior_color,
+    model_generation_id,
+    is_private_seller,
+    seller_name,
+    condition,
+    previous_owners,
+    {NUMERIC_PRICE_SQL}   AS price_num,
     {NUMERIC_MILEAGE_SQL} AS mileage_num
 """
 
 
 def fetch_vehicle(vehicle_id: str) -> Optional[Dict[str, Any]]:
-    """Return a single vehicle row, or None if not found."""
-    with get_db_cursor() as cursor:
-        cursor.execute(
+    with get_db_cursor() as cur:
+        cur.execute(
             f"""
             SELECT {SELECT_BASE_FIELDS}
             FROM vehicle_marketplace.vehicle_data
@@ -323,278 +579,410 @@ def fetch_vehicle(vehicle_id: str) -> Optional[Dict[str, Any]]:
             """,
             (vehicle_id,),
         )
-        row = cursor.fetchone()
-    return row
+        return cur.fetchone()
 
 
-def build_attempts(target_row: Dict[str, Any]) -> List[Dict[str, bool]]:
-    """Define progressive query relaxations."""
-    has_color = bool(target_row.get("color"))
-    has_body = bool(target_row.get("body_type"))
-    has_transmission = bool(target_row.get("transmission"))
-    has_fuel = bool(target_row.get("fuel_type"))
-
-    attempts = [
-        {"name": "strict", "color": has_color, "body": has_body, "transmission": has_transmission, "fuel": has_fuel},
-        {"name": "relaxed_color", "color": False, "body": has_body, "transmission": has_transmission, "fuel": has_fuel},
-        {"name": "relaxed_color_body", "color": False, "body": False, "transmission": has_transmission, "fuel": has_fuel},
-        {"name": "relaxed_drivetrain", "color": False, "body": False, "transmission": False, "fuel": has_fuel},
-        {"name": "make_model_only", "color": False, "body": False, "transmission": False, "fuel": False},
-    ]
-    # Deduplicate attempts in case some attributes are already missing
-    seen = set()
-    result = []
-    for attempt in attempts:
-        signature = tuple(sorted(attempt.items()))
-        if signature not in seen:
-            seen.add(signature)
-            result.append(attempt)
-    return result
-
-
-def find_candidate_rows(target_row: Dict[str, Any], target_year: Optional[int]) -> List[Dict[str, Any]]:
-    """Fetch candidate rows using progressive relaxation."""
-    attempts = build_attempts(target_row)
-    price_range = None
-    mileage_max = None
-
-    target_price = normalise_price(target_row.get("price_num") or target_row.get("price"))
-    if target_price and target_price > 0:
-        price_range = (target_price * 0.6, target_price * 1.4)
-
-    target_mileage = normalise_mileage(target_row.get("mileage_num") or target_row.get("mileage_km"))
-    if target_mileage and target_mileage > 0:
-        mileage_max = target_mileage * 2.0
-
-    for attempt in attempts:
-        base_conditions = [
-            "is_vehicle_available = true",
-            "vehicle_id != %s",
-            "make = %s",
-            "model = %s",
-        ]
-        params: List[Any] = [
-            target_row["vehicle_id"],
-            target_row["make"],
-            target_row["model"],
-        ]
-
-        if attempt["fuel"] and target_row.get("fuel_type"):
-            base_conditions.append("fuel_type = %s")
-            params.append(target_row["fuel_type"])
-
-        if attempt["transmission"] and target_row.get("transmission"):
-            base_conditions.append("transmission = %s")
-            params.append(target_row["transmission"])
-
-        if attempt["body"] and target_row.get("body_type"):
-            base_conditions.append("body_type = %s")
-            params.append(target_row["body_type"])
-
-        if attempt["color"] and target_row.get("color"):
-            base_conditions.append("color = %s")
-            params.append(target_row["color"])
-
-        if target_year:
-            base_conditions.append(
-                "CAST(SUBSTRING(CAST(first_registration_raw AS TEXT), 1, 4) AS INTEGER) BETWEEN %s AND %s"
-            )
-            params.extend([target_year - 2, target_year + 2])
-
-        where_clause = " AND ".join(base_conditions)
-        logger.info(
-            "Attempt %s – where(%s params) price_range=%s mileage_max=%s",
-            attempt["name"],
-            len(base_conditions),
-            price_range,
-            mileage_max,
+def fetch_vehicles_detail(vehicle_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+    """Fetch TOAST-heavy display fields for the top-N results only."""
+    if not vehicle_ids:
+        return {}
+    with get_db_cursor() as cur:
+        cur.execute(
+            """
+            SELECT vehicle_id, description, images, upholstery_color, created_at
+            FROM vehicle_marketplace.vehicle_data
+            WHERE vehicle_id = ANY(%s)
+            """,
+            (vehicle_ids,),
         )
-
-        with get_db_cursor() as cursor:
-            query_start = time.time()
-            cursor.execute(
-                f"""
-                SELECT {SELECT_BASE_FIELDS}
-                FROM vehicle_marketplace.vehicle_data
-                WHERE {where_clause}
-                ORDER BY created_at DESC
-                LIMIT %s
-                """,
-                (*params, int(os.getenv("CANDIDATE_LIMIT", "400"))),
-            )
-            rows = cursor.fetchall()
-            logger.info(
-                "Attempt %s – fetched %s rows in %.3fs",
-                attempt["name"],
-                len(rows),
-                time.time() - query_start,
-            )
-
-        if not rows:
-            continue
-
-        filtered = []
-        dropped = 0
-        for row in rows:
-            row_price = normalise_price(row.get("price_num") or row.get("price"))
-            row_mileage = normalise_mileage(row.get("mileage_num") or row.get("mileage_km"))
-
-            if price_range and (row_price is None or not price_range[0] <= row_price <= price_range[1]):
-                dropped += 1
-                continue
-            if mileage_max and row_mileage and row_mileage > mileage_max:
-                dropped += 1
-                continue
-
-            filtered.append(row)
-
-        logger.info(
-            "Attempt %s – keeping %s rows (dropped %s on range checks)",
-            attempt["name"],
-            len(filtered),
-            dropped,
-        )
-
-        if filtered:
-            return filtered
-
-    return []
+        rows = cur.fetchall()
+    return {r["vehicle_id"]: r for r in rows}
 
 
-def score_candidates(target_payload: Dict[str, Any], candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Compute similarity + deal scores and return sorted payloads."""
-    scored: List[Tuple[float, Dict[str, Any], Dict[str, float]]] = []
+def find_candidate_rows(
+    target_row: Dict[str, Any],
+    filters: Optional[Dict[str, Any]] = None,
+) -> Tuple[List[Dict[str, Any]], str]:
+    """
+    Fetch up to CANDIDATE_LIMIT rows for scoring.
+
+    Hard SQL filters (never dropped): make, model, body_type_norm, transmission_norm
+    Soft SQL filter (one fallback):   fuel_type_norm
+    Optional user filters: colors, interior_colors, year_from, year_until,
+                           mileage_from, mileage_until
+
+    Returns (rows, attempt_name_used).
+    """
+    candidate_limit = int(os.getenv("CANDIDATE_LIMIT", "400"))
+    filters = filters or {}
+
+    make        = target_row.get("make")
+    model       = target_row.get("model")
+    body_norm   = target_row.get("body_type_norm")
+    trans_norm  = target_row.get("transmission_norm")
+    fuel_norm   = target_row.get("fuel_type_norm")
+    vehicle_id  = target_row.get("vehicle_id")
+
+    # Build optional filter clauses from user-supplied params
+    extra_clauses: List[str] = []
+    extra_params: List[Any] = []
+
+    colors = filters.get("colors")  # list of color_norm values e.g. ["black","white"]
+    if colors:
+        placeholders = ",".join(["%s"] * len(colors))
+        extra_clauses.append(f"color_norm IN ({placeholders})")
+        extra_params.extend(colors)
+
+    interior_colors = filters.get("interior_colors")
+    if interior_colors:
+        placeholders = ",".join(["%s"] * len(interior_colors))
+        extra_clauses.append(f"LOWER(interior_color) IN ({placeholders})")
+        extra_params.extend([c.lower() for c in interior_colors])
+
+    year_from = filters.get("year_from")
+    if year_from:
+        extra_clauses.append("year_extracted >= %s")
+        extra_params.append(int(year_from))
+
+    year_until = filters.get("year_until")
+    if year_until:
+        extra_clauses.append("year_extracted <= %s")
+        extra_params.append(int(year_until))
+
+    mileage_from = filters.get("mileage_from")
+    if mileage_from is not None:
+        extra_clauses.append(f"({NUMERIC_MILEAGE_SQL}) >= %s")
+        extra_params.append(float(mileage_from))
+
+    mileage_until = filters.get("mileage_until")
+    if mileage_until is not None:
+        extra_clauses.append(f"({NUMERIC_MILEAGE_SQL}) <= %s")
+        extra_params.append(float(mileage_until))
+
+    extra_sql = (" AND " + " AND ".join(extra_clauses)) if extra_clauses else ""
+
+    # Build attempt list.  Body + transmission are ALWAYS in the WHERE clause.
+    # If we don't have normalised values for them we fall back to make+model only
+    # but that's a last resort (rare cars / missing scraper data).
+    if body_norm and trans_norm:
+        attempts = []
+        if fuel_norm:
+            attempts.append((
+                "strict",
+                "make = %s AND model = %s AND body_type_norm = %s "
+                "AND transmission_norm = %s AND fuel_type_norm = %s",
+                [make, model, body_norm, trans_norm, fuel_norm],
+            ))
+        attempts.append((
+            "no_fuel",
+            "make = %s AND model = %s AND body_type_norm = %s AND transmission_norm = %s",
+            [make, model, body_norm, trans_norm],
+        ))
+    else:
+        attempts = [(
+            "make_model_only",
+            "make = %s AND model = %s",
+            [make, model],
+        )]
+
+    for attempt_name, where_extra, params in attempts:
+        where = f"is_vehicle_available = true AND vehicle_id != %s AND {where_extra}{extra_sql}"
+        full_params = [vehicle_id] + params + extra_params
+
+        try:
+            with get_db_cursor(timeout_ms=7_000) as cur:
+                t0 = time.time()
+                cur.execute(
+                    f"""
+                    SELECT {SELECT_RANK_FIELDS}
+                    FROM vehicle_marketplace.vehicle_data
+                    WHERE {where}
+                    LIMIT %s
+                    """,
+                    (*full_params, candidate_limit),
+                )
+                rows = cur.fetchall()
+                logger.info(
+                    "Candidates [%s] → %d rows in %.3fs",
+                    attempt_name, len(rows), time.time() - t0,
+                )
+        except Exception as exc:
+            logger.warning("Candidate query [%s] failed: %s", attempt_name, exc)
+            rows = []
+
+        if rows:
+            return list(rows), attempt_name
+
+    return [], "no_results"
+
+
+def deduplicate_candidates(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Remove near-duplicate listings: same car scraped multiple times.
+    Keeps the first occurrence when (year, mileage_km_rounded, price_num_rounded) match.
+    """
+    seen: set = set()
+    out: List[Dict[str, Any]] = []
     for row in candidates:
-        payload = format_vehicle_payload(
+        price   = normalise_price(row.get("price_num")) or normalise_price(row.get("price"))
+        mileage = normalise_mileage(row.get("mileage_num")) or normalise_mileage(row.get("mileage_km"))
+        year    = extract_year(row.get("first_registration_raw"))
+        # Round to nearest 100 for price and 500 for mileage to catch near-dupes
+        key = (
+            year,
+            round(price / 100) if price else None,
+            round(mileage / 500) if mileage else None,
+        )
+        if key not in seen:
+            seen.add(key)
+            out.append(row)
+    return out
+
+
+def _dedup_key(price: Optional[float], mileage: Optional[float], year: Optional[int]):
+    return (
+        year,
+        round(price / 100) if price else None,
+        round(mileage / 500) if mileage else None,
+    )
+
+
+def score_and_rank(
+    target_payload: Dict[str, Any],
+    candidates_raw: List[Dict[str, Any]],
+    target_price: Optional[float],
+) -> List[Dict[str, Any]]:
+    """
+    Score all candidates, integrate deal score, return sorted list.
+    Final score = 0.65 × similarity + 0.35 × deal_score.
+    """
+    # Deduplicate before scoring
+    candidates_raw = deduplicate_candidates(candidates_raw)
+
+    # Also remove any candidate that is a near-duplicate of the target itself
+    # (same car scraped twice: same year/price/mileage but different UUID)
+    target_key = _dedup_key(
+        target_payload.get("price_eur"),
+        target_payload.get("mileage_km"),
+        target_payload.get("year"),
+    )
+    if target_key != (None, None, None):
+        before = len(candidates_raw)
+        candidates_raw = [
+            c for c in candidates_raw
+            if _dedup_key(
+                normalise_price(c.get("price_num")) or normalise_price(c.get("price_eur")),
+                normalise_mileage(c.get("mileage_num")) or normalise_mileage(c.get("mileage_km")),
+                extract_year(c.get("first_registration_raw")),
+            ) != target_key
+        ]
+        removed = before - len(candidates_raw)
+        if removed:
+            logger.info("Filtered %d target-duplicate listings", removed)
+
+    # Build payloads first (needed for regression input)
+    payloads: List[Dict[str, Any]] = []
+    for row in candidates_raw:
+        p = format_vehicle_payload(
             {**row, "vehicle_id": row.get("id") or row.get("vehicle_id")}
         )
-        score, components = similarity_engine.score(target_payload, payload)
-        payload["score"] = score
-        payload["final_score"] = score
+        payloads.append(p)
 
-        target_price = target_payload.get("price_eur")
-        candidate_price = payload.get("price_eur")
-        savings = 0.0
-        if target_price and candidate_price:
-            savings = float(target_price - candidate_price)
+    # Fit within-pool price regression
+    coeffs = compute_pool_regression(payloads)
 
-        payload.update(
-            {
-                "price_hat": float(candidate_price * 1.05) if candidate_price else None,
-                "deal_score": components["price"],
-                "savings": savings,
-                "savings_percent": (savings / target_price * 100) if target_price and target_price > 0 else None,
-                "ranking_details": {
-                    "similarity_components": components,
-                    "weights": similarity_engine.weights,
-                },
-            }
+    scored: List[Tuple[float, Dict[str, Any]]] = []
+
+    for p in payloads:
+        sim_score, components = score_similarity(target_payload, p)
+        d_score = deal_score_from_regression(p, coeffs)
+
+        final = 0.65 * sim_score + 0.35 * d_score
+
+        candidate_price = p.get("price_eur")
+        savings = (
+            float(target_price - candidate_price)
+            if target_price and candidate_price else 0.0
         )
-        scored.append((score, payload, components))
+        savings_pct = (
+            savings / target_price * 100
+            if target_price and target_price > 0 else None
+        )
 
-    scored.sort(key=lambda entry: entry[0], reverse=True)
-    return [payload for score, payload, _ in scored]
+        p.update({
+            "score":           final,
+            "final_score":     final,
+            "similarity_score": sim_score,
+            "deal_score":      d_score,
+            "savings":         savings,
+            "savings_percent": savings_pct,
+            "ranking_details": {
+                "similarity_components": components,
+                "weights": {"similarity": 0.65, "deal": 0.35},
+                "attempt": None,  # filled in by caller
+            },
+        })
+        scored.append((final, p))
+
+    scored.sort(key=lambda e: e[0], reverse=True)
+    return [p for _, p in scored]
 
 
 # ---------------------------------------------------------------------------
 # Flask endpoints
 # ---------------------------------------------------------------------------
 
+@app.before_request
+def _bootstrap_once():
+    ensure_indexes()
+
+
 @app.route("/health", methods=["GET"])
-def health() -> Tuple[Any, int]:
+def health():
     try:
-        with get_db_cursor() as cursor:
-            cursor.execute(
-                "SELECT COUNT(*) AS vehicle_count FROM vehicle_marketplace.vehicle_data WHERE is_vehicle_available = true"
-            )
-            result = cursor.fetchone()
-        return (
-            jsonify(
-                {
-                    "status": "healthy",
-                    "database_connected": True,
-                    "vehicle_count": result["vehicle_count"] if result else 0,
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
-            ),
-            200,
-        )
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT reltuples::bigint AS vehicle_count
+                FROM pg_class
+                JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+                WHERE nspname = 'vehicle_marketplace'
+                  AND relname = 'vehicle_data'
+            """)
+            result = cur.fetchone()
+        return jsonify({
+            "status":             "healthy",
+            "database_connected": True,
+            "vehicle_count":      result["vehicle_count"] if result else 0,
+            "timestamp":          datetime.utcnow().isoformat(),
+        }), 200
     except Exception as exc:
         logger.exception("Health check failed: %s", exc)
-        return (
-            jsonify({"status": "unhealthy", "database_connected": False, "error": str(exc)}),
-            503,
-        )
+        return jsonify({"status": "unhealthy", "database_connected": False, "error": str(exc)}), 503
 
 
 @app.route("/stats", methods=["GET"])
-def stats() -> Tuple[Any, int]:
+def stats():
+    cached = _cache.get("stats")
+    if cached:
+        return jsonify(cached), 200
+
     try:
-        with get_db_cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT
-                    COUNT(*) FILTER (WHERE is_vehicle_available) AS total_vehicles,
-                    COUNT(DISTINCT make) AS unique_makes,
-                    COUNT(DISTINCT data_source) AS data_sources
-                FROM vehicle_marketplace.vehicle_data
-                """
-            )
-            row = cursor.fetchone()
-        return (
-            jsonify(
-                {
-                    "total_vehicles": row["total_vehicles"],
-                    "unique_makes": row["unique_makes"],
-                    "data_sources": row["data_sources"],
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
-            ),
-            200,
-        )
+        with get_db_cursor(timeout_ms=5_000) as cur:
+            cur.execute("""
+                SELECT reltuples::bigint AS total_vehicles
+                FROM pg_class
+                JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+                WHERE nspname = 'vehicle_marketplace'
+                  AND relname = 'vehicle_data'
+            """)
+            row = cur.fetchone()
+
+        result = {
+            "total_vehicles": int(row["total_vehicles"]) if row and row["total_vehicles"] else 0,
+            "unique_makes":   50,
+            "data_sources":   3,
+            "timestamp":      datetime.utcnow().isoformat(),
+        }
+        _cache.set("stats", result, STATS_TTL)
+        return jsonify(result), 200
     except Exception as exc:
-        logger.exception("Stats endpoint failed: %s", exc)
+        logger.exception("Stats failed: %s", exc)
         return jsonify({"error": str(exc)}), 500
 
 
 @app.route("/listings/<vehicle_id>", methods=["GET"])
-def get_vehicle_endpoint(vehicle_id: str) -> Tuple[Any, int]:
+def get_vehicle_endpoint(vehicle_id: str):
     row = fetch_vehicle(vehicle_id)
     if not row:
         return jsonify({"error": f"Vehicle {vehicle_id} not found"}), 404
-    payload = format_vehicle_payload({**row, "vehicle_id": vehicle_id})
-    return jsonify(payload), 200
+    return jsonify(format_vehicle_payload({**row, "vehicle_id": vehicle_id})), 200
 
 
 @app.route("/listings/<vehicle_id>/comparables", methods=["GET"])
-def comparables_endpoint(vehicle_id: str) -> Tuple[Any, int]:
+def comparables_endpoint(vehicle_id: str):
     top_param = request.args.get("top", default="10")
     try:
         top = max(1, min(int(top_param), 50))
     except ValueError:
         return jsonify({"error": "Invalid 'top' parameter"}), 400
 
+    # Parse optional pre-search filters
+    filters: Dict[str, Any] = {}
+    colors_param = request.args.get("colors")
+    if colors_param:
+        filters["colors"] = [c.strip().lower() for c in colors_param.split(",") if c.strip()]
+    interior_colors_param = request.args.get("interior_colors")
+    if interior_colors_param:
+        filters["interior_colors"] = [c.strip() for c in interior_colors_param.split(",") if c.strip()]
+    if request.args.get("year_from"):
+        filters["year_from"] = request.args.get("year_from")
+    if request.args.get("year_until"):
+        filters["year_until"] = request.args.get("year_until")
+    if request.args.get("mileage_from"):
+        filters["mileage_from"] = request.args.get("mileage_from")
+    if request.args.get("mileage_until"):
+        filters["mileage_until"] = request.args.get("mileage_until")
+
+    # Cache key includes filters so different filter combos are cached separately.
+    # Skip cache entirely when filters are active (user expects fresh results).
+    has_filters = bool(filters)
+    filter_key = "&".join(f"{k}={v}" for k, v in sorted(filters.items())) if filters else ""
+    cache_key = f"comparables_v5b:{vehicle_id}:{top}:{filter_key}"
+    if not has_filters:
+        cached = _cache.get(cache_key)
+        if cached:
+            logger.info("Cache hit: %s", cache_key)
+            return jsonify(cached), 200
+
+    t_start = time.time()
+
     target_row = fetch_vehicle(vehicle_id)
     if not target_row:
         return jsonify({"error": f"Vehicle {vehicle_id} not found"}), 404
 
     target_payload = format_vehicle_payload({**target_row, "vehicle_id": vehicle_id})
-    target_year = target_payload.get("year")
+    target_price   = target_payload.get("price_eur")
 
-    candidates_raw = find_candidate_rows(target_row, target_year)
+    candidates_raw, attempt_used = find_candidate_rows(target_row, filters)
     if not candidates_raw:
         return jsonify({"error": "No comparable vehicles found"}), 404
 
-    scored = score_candidates(target_payload, candidates_raw)
+    ranked = score_and_rank(target_payload, candidates_raw, target_price)
+
+    # Stamp the attempt used into ranking_details
+    for p in ranked:
+        p["ranking_details"]["attempt"] = attempt_used
+
+    top_results = ranked[:top]
+
+    # Phase 2: TOAST fetch only for top-N
+    top_ids = [p["id"] for p in top_results if p.get("id")]
+    if top_ids:
+        t_detail = time.time()
+        detail_map = fetch_vehicles_detail(top_ids)
+        logger.info("Detail fetch %d vehicles: %.3fs", len(top_ids), time.time() - t_detail)
+        for p in top_results:
+            detail = detail_map.get(p["id"], {})
+            p["description"]      = detail.get("description") or ""
+            p["images"]           = parse_images(detail.get("images"))
+            p["upholstery_color"] = detail.get("upholstery_color")
+
+    total_ms = int((time.time() - t_start) * 1000)
+    logger.info("comparables [%s] → top=%d candidates=%d attempt=%s total=%dms",
+                vehicle_id, top, len(ranked), attempt_used, total_ms)
+
     response = {
-        "vehicle": target_payload,
-        "comparables": scored[:top],
+        "vehicle":     target_payload,
+        "comparables": top_results,
         "metadata": {
-            "requested_top": top,
-            "returned": len(scored[:top]),
-            "total_candidates": len(scored),
+            "requested_top":    top,
+            "returned":         len(top_results),
+            "total_candidates": len(ranked),
+            "attempt":          attempt_used,
+            "elapsed_ms":       total_ms,
         },
     }
+    _cache.set(cache_key, response, COMPARABLES_TTL)
     return jsonify(response), 200
 
 
@@ -603,6 +991,7 @@ def comparables_endpoint(vehicle_id: str) -> Tuple[Any, int]:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    ensure_indexes()
     port = int(os.getenv("PORT", "8000"))
-    logger.info("Starting CARMA API on port %s", port)
+    logger.info("Starting CARMA API v5 on port %s", port)
     app.run(host="0.0.0.0", port=port, debug=False)

@@ -1,7 +1,7 @@
 "use client"
 /* eslint-disable @next/next/no-img-element */
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
@@ -89,18 +89,20 @@ function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
 }
 
 const EXTERIOR_COLORS = [
-  { name: "Black",  hex: "#1a1a1a" },
-  { name: "White",  hex: "#FFFFFF" },
-  { name: "Silver", hex: "#C0C0C0" },
-  { name: "Gray",   hex: "#808080" },
-  { name: "Blue",   hex: "#2563EB" },
-  { name: "Red",    hex: "#DC2626" },
-  { name: "Green",  hex: "#16a34a" },
-  { name: "Brown",  hex: "#8B4513" },
-  { name: "Beige",  hex: "#F5F5DC" },
-  { name: "Orange", hex: "#F97316" },
-  { name: "Yellow", hex: "#EAB308" },
+  { name: "Black",  norm: "black",  hex: "#1a1a1a" },
+  { name: "White",  norm: "white",  hex: "#FFFFFF" },
+  { name: "Silver", norm: "silver", hex: "#C0C0C0" },
+  { name: "Gray",   norm: "grey",   hex: "#808080" },
+  { name: "Blue",   norm: "blue",   hex: "#2563EB" },
+  { name: "Red",    norm: "red",    hex: "#DC2626" },
+  { name: "Green",  norm: "green",  hex: "#16a34a" },
+  { name: "Brown",  norm: "brown",  hex: "#8B4513" },
+  { name: "Beige",  norm: "beige",  hex: "#F5F5DC" },
+  { name: "Orange", norm: "orange", hex: "#F97316" },
+  { name: "Yellow", norm: "yellow", hex: "#EAB308" },
 ]
+
+const INTERIOR_COLORS = ["Black", "Beige", "Grey", "Brown", "Red", "White", "Blue"]
 
 const REGISTRATION_YEARS = ["2013","2014","2015","2016","2017","2018","2019","2020","2021","2022","2023","2024","2025"]
 
@@ -129,6 +131,7 @@ export default function HomePageB() {
   const [heroMileFrom, setHeroMileFrom] = useState("")
   const [heroMileUntil, setHeroMileUntil] = useState("")
   const [heroExtColors, setHeroExtColors] = useState<string[]>([])
+  const [heroIntColors, setHeroIntColors] = useState<string[]>([])
   const { user, isAuthenticated, signOut } = useAuth()
   const { toast } = useToast()
 
@@ -174,7 +177,15 @@ export default function HomePageB() {
     heroRequestRef.current = controller
 
     try {
-      const results = await compareVehicle(heroUrl.trim(), { top: 12, signal: controller.signal })
+      const filters: import("@/lib/api").SearchFilters = {}
+      if (heroExtColors.length > 0)  filters.colors = heroExtColors.map(n => EXTERIOR_COLORS.find(c => c.name === n)?.norm ?? n.toLowerCase())
+      if (heroIntColors.length > 0)  filters.interiorColors = heroIntColors
+      if (heroRegFrom)               filters.yearFrom = heroRegFrom
+      if (heroRegUntil)              filters.yearUntil = heroRegUntil
+      if (heroMileFrom)              filters.mileageFrom = heroMileFrom
+      if (heroMileUntil)             filters.mileageUntil = heroMileUntil
+
+      const results = await compareVehicle(heroUrl.trim(), { top: 12, signal: controller.signal, filters })
       setHeroResults(results)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50)
     } catch (err) {
@@ -185,17 +196,7 @@ export default function HomePageB() {
     }
   }
 
-  const filteredHeroComparables = useMemo(() => {
-    if (!heroResults) return []
-    return heroResults.comparables.filter((v) => {
-      if (heroExtColors.length > 0 && !heroExtColors.includes(v.exterior_color || "Other")) return false
-      if (heroRegFrom && v.year < parseInt(heroRegFrom)) return false
-      if (heroRegUntil && v.year > parseInt(heroRegUntil)) return false
-      if (heroMileFrom && v.mileage_km < parseInt(heroMileFrom)) return false
-      if (heroMileUntil && v.mileage_km > parseInt(heroMileUntil)) return false
-      return true
-    }).slice(0, 12)
-  }, [heroResults, heroExtColors, heroRegFrom, heroRegUntil, heroMileFrom, heroMileUntil])
+  const filteredHeroComparables = heroResults?.comparables ?? []
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
@@ -443,7 +444,7 @@ export default function HomePageB() {
                     </div>
                   </div>
 
-                  {/* Color swatches */}
+                  {/* Exterior color swatches */}
                   <div>
                     <p className="text-xs text-muted-foreground font-medium mb-2">Exterior Color</p>
                     <div className="flex flex-wrap gap-2">
@@ -469,6 +470,40 @@ export default function HomePageB() {
                       {heroExtColors.length > 0 && (
                         <button
                           onClick={() => setHeroExtColors([])}
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors self-center ml-1"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Interior color chips */}
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium mb-2">Interior Color</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {INTERIOR_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() =>
+                            setHeroIntColors((prev) =>
+                              prev.includes(color)
+                                ? prev.filter((c) => c !== color)
+                                : [...prev, color]
+                            )
+                          }
+                          className={`h-6 px-2.5 rounded-full text-xs font-medium border transition-all duration-150 ${
+                            heroIntColors.includes(color)
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {color}
+                        </button>
+                      ))}
+                      {heroIntColors.length > 0 && (
+                        <button
+                          onClick={() => setHeroIntColors([])}
                           className="text-xs text-muted-foreground hover:text-foreground transition-colors self-center ml-1"
                         >
                           Clear
