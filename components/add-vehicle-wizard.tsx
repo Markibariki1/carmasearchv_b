@@ -269,8 +269,12 @@ export function AddVehicleWizard({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="theme-b max-w-[95vw] xl:max-w-7xl max-h-[85vh] overflow-hidden p-0 bg-background text-foreground">
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+      <DialogContent
+        className="theme-b max-w-[95vw] xl:max-w-7xl max-h-[85vh] overflow-hidden p-0 bg-background text-foreground"
+        onPointerDownOutside={() => onOpenChange(false)}
+        onEscapeKeyDown={() => onOpenChange(false)}
+      >
         <DialogHeader className="px-8 pt-6 pb-2">
           <DialogTitle className="text-xl font-bold">
             {mode === "add" ? "Add Vehicle" : "Edit Vehicle"}
@@ -363,42 +367,42 @@ export function AddVehicleWizard({
                 <div className="space-y-1.5">
                   <Label>Fuel Type</Label>
                   <Select value={form.fuel_type || ""} onValueChange={(v) => set("fuel_type", v || undefined)}>
-                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>{FUEL_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Transmission</Label>
                   <Select value={form.transmission || ""} onValueChange={(v) => set("transmission", v || undefined)}>
-                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>{TRANSMISSIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Body Type</Label>
                   <Select value={form.body_type || ""} onValueChange={(v) => set("body_type", v || undefined)}>
-                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>{BODY_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Drivetrain</Label>
                   <Select value={form.drivetrain || ""} onValueChange={(v) => set("drivetrain", v || undefined)}>
-                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>{DRIVETRAINS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Exterior Color</Label>
                   <Select value={form.exterior_color || ""} onValueChange={(v) => set("exterior_color", v || undefined)}>
-                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>{EXTERIOR_COLORS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Interior Color</Label>
                   <Select value={form.interior_color || ""} onValueChange={(v) => set("interior_color", v || undefined)}>
-                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>{INTERIOR_COLORS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
@@ -417,14 +421,14 @@ export function AddVehicleWizard({
                 <div className="space-y-1.5">
                   <Label>Doors</Label>
                   <Select value={form.num_doors?.toString() || ""} onValueChange={(v) => set("num_doors", v ? Number(v) : undefined)}>
-                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>{[2, 3, 4, 5].map((n) => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Seats</Label>
                   <Select value={form.num_seats?.toString() || ""} onValueChange={(v) => set("num_seats", v ? Number(v) : undefined)}>
-                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>{[2, 4, 5, 7, 8, 9].map((n) => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
@@ -447,7 +451,7 @@ export function AddVehicleWizard({
               <div className="space-y-1.5 mt-3">
                 <Label>Condition</Label>
                 <Select value={form.condition || ""} onValueChange={(v) => set("condition", v || undefined)}>
-                  <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>{CONDITIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
