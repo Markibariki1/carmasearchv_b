@@ -18,7 +18,6 @@ import {
   TRANSMISSIONS,
   BODY_TYPES,
   DRIVETRAINS,
-  CONDITIONS,
   EXTERIOR_COLORS,
   INTERIOR_COLORS,
 } from "@/types/portfolio"
@@ -272,8 +271,14 @@ export function AddVehicleWizard({
     <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogContent
         className="theme-b max-w-[95vw] xl:max-w-7xl max-h-[85vh] overflow-hidden p-0 bg-background text-foreground"
-        onPointerDownOutside={() => onOpenChange(false)}
-        onEscapeKeyDown={() => onOpenChange(false)}
+        onPointerDownOutside={(e) => {
+          // Don't close when clicking dropdown portals (they render outside DialogContent)
+          const target = e.target as HTMLElement
+          if (target.closest("[data-radix-popper-content-wrapper]") || target.closest("[data-radix-select-viewport]")) {
+            e.preventDefault()
+            return
+          }
+        }}
       >
         <DialogHeader className="px-8 pt-6 pb-2">
           <DialogTitle className="text-xl font-bold">
@@ -438,30 +443,13 @@ export function AddVehicleWizard({
             {/* COLUMN 3: Additional Details */}
             <div className="border-t border-border lg:border-t-0 lg:border-l lg:pl-8 pt-5 lg:pt-0">
               <SectionHeader icon={FileText} title="Additional Details" optional />
-              <div className="grid grid-cols-2 gap-3 mt-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="vin">VIN</Label>
-                  <Input id="vin" value={form.vin || ""} onChange={(e) => set("vin", e.target.value.toUpperCase())} placeholder="WBSWD9C58AP..." maxLength={17} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="license_plate">License Plate</Label>
-                  <Input id="license_plate" value={form.license_plate || ""} onChange={(e) => set("license_plate", e.target.value.toUpperCase())} placeholder="M-AB 1234" />
-                </div>
-              </div>
-              <div className="space-y-1.5 mt-3">
-                <Label>Condition</Label>
-                <Select value={form.condition || ""} onValueChange={(v) => set("condition", v || undefined)}>
-                  <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
-                  <SelectContent>{CONDITIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
               <div className="space-y-1.5 mt-3">
                 <Label htmlFor="modifications">Modifications</Label>
-                <Textarea id="modifications" value={form.modifications || ""} onChange={(e) => set("modifications", e.target.value)} placeholder="e.g. Akrapovic exhaust, KW coilovers..." rows={3} />
+                <Textarea id="modifications" value={form.modifications || ""} onChange={(e) => set("modifications", e.target.value)} placeholder="e.g. Akrapovic exhaust, KW coilovers..." rows={4} />
               </div>
               <div className="space-y-1.5 mt-3">
                 <Label htmlFor="notes">Notes</Label>
-                <Textarea id="notes" value={form.notes || ""} onChange={(e) => set("notes", e.target.value)} placeholder="Any additional notes..." rows={3} />
+                <Textarea id="notes" value={form.notes || ""} onChange={(e) => set("notes", e.target.value)} placeholder="Any additional notes..." rows={4} />
               </div>
             </div>
 
