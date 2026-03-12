@@ -1,15 +1,18 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { useToast } from "@/hooks/use-toast"
-import { Car, Receipt, Settings2, FileText, Sparkles } from "lucide-react"
+import { Car, Receipt, Settings2, FileText, Sparkles, ChevronsUpDown, Check } from "lucide-react"
 import { useVehicleSpecs } from "@/hooks/use-vehicle-specs"
+import { cn } from "@/lib/utils"
 import {
   FUEL_TYPES,
   TRANSMISSIONS,
@@ -36,6 +39,68 @@ function SectionHeader({ icon: Icon, title, optional }: { icon: React.ElementTyp
       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{title}</span>
       {optional && <span className="text-xs text-muted-foreground/60 font-normal ml-1">— Optional</span>}
     </div>
+  )
+}
+
+/** Searchable combobox for Make / Model selection */
+function SearchableSelect({
+  value,
+  onSelect,
+  options,
+  placeholder,
+  searchPlaceholder,
+  disabled,
+  id,
+}: {
+  value: string
+  onSelect: (value: string) => void
+  options: string[]
+  placeholder: string
+  searchPlaceholder: string
+  disabled?: boolean
+  id?: string
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className="w-full justify-between font-normal h-9 px-3"
+        >
+          <span className="truncate">{value || placeholder}</span>
+          <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} />
+          <CommandList className="max-h-60">
+            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandGroup>
+              {options.map((opt) => (
+                <CommandItem
+                  key={opt}
+                  value={opt}
+                  onSelect={() => {
+                    onSelect(opt)
+                    setOpen(false)
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", value === opt ? "opacity-100" : "opacity-0")} />
+                  {opt}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -135,7 +200,6 @@ export function AddVehicleWizard({
 
     setForm((prev) => {
       const updates: Partial<PortfolioVehicleInsert> = { ...prev }
-      // Only fill fields that are empty/undefined
       if (!prev.fuel_type && specs.fuel_type) updates.fuel_type = specs.fuel_type
       if (!prev.transmission && specs.transmission) updates.transmission = specs.transmission
       if (!prev.drivetrain && specs.drive) updates.drivetrain = specs.drive
@@ -168,7 +232,6 @@ export function AddVehicleWizard({
     if (!form.purchase_price || form.purchase_price <= 0) errs.purchase_price = "Enter a valid price"
     setErrors(errs)
     if (Object.keys(errs).length > 0) {
-      // Scroll to first error
       const firstErrorField = Object.keys(errs)[0]
       document.getElementById(firstErrorField)?.scrollIntoView({ behavior: "smooth", block: "center" })
       return false
@@ -207,41 +270,46 @@ export function AddVehicleWizard({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="theme-b max-w-5xl max-h-[85vh] overflow-hidden p-0 bg-background text-foreground">
-        <DialogHeader className="px-6 pt-6 pb-2">
+      <DialogContent className="theme-b max-w-[95vw] xl:max-w-7xl max-h-[85vh] overflow-hidden p-0 bg-background text-foreground">
+        <DialogHeader className="px-8 pt-6 pb-2">
           <DialogTitle className="text-xl font-bold">
             {mode === "add" ? "Add Vehicle" : "Edit Vehicle"}
           </DialogTitle>
         </DialogHeader>
 
-        {/* Scrollable form — two-column layout */}
-        <div className="overflow-y-auto px-6 pb-2" style={{ maxHeight: "calc(85vh - 140px)" }}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-0">
+        {/* Scrollable form — three-column layout */}
+        <div className="overflow-y-auto px-8 pb-2" style={{ maxHeight: "calc(85vh - 140px)" }}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-0">
 
-            {/* LEFT COLUMN */}
+            {/* COLUMN 1: Vehicle Identity + Purchase Info */}
             <div>
-              {/* Section 1: Vehicle Identity */}
+              {/* Vehicle Identity */}
               <div className="pb-5 border-b border-border">
                 <SectionHeader icon={Car} title="Vehicle Identity" />
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="make">Make *</Label>
-                    <Select value={form.make || ""} onValueChange={handleMakeChange}>
-                      <SelectTrigger id="make"><SelectValue placeholder="Select make..." /></SelectTrigger>
-                      <SelectContent className="max-h-60">
-                        {makes.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      id="make"
+                      value={form.make || ""}
+                      onSelect={handleMakeChange}
+                      options={makes}
+                      placeholder="Select make..."
+                      searchPlaceholder="Search makes..."
+                    />
                     {errors.make && <p className="text-xs text-destructive">{errors.make}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="model">Model *</Label>
-                    <Select value={form.model || ""} onValueChange={handleModelChange} disabled={!form.make}>
-                      <SelectTrigger id="model"><SelectValue placeholder={form.make ? "Select model..." : "Select make first"} /></SelectTrigger>
-                      <SelectContent className="max-h-60">
-                        {models.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      id="model"
+                      value={form.model || ""}
+                      onSelect={handleModelChange}
+                      options={models}
+                      placeholder={form.make ? "Select model..." : "Select make first"}
+                      searchPlaceholder="Search models..."
+                      disabled={!form.make}
+                    />
                     {errors.model && <p className="text-xs text-destructive">{errors.model}</p>}
                   </div>
                   <div className="space-y-1.5">
@@ -256,72 +324,42 @@ export function AddVehicleWizard({
                 </div>
               </div>
 
-              {/* Section 2: Purchase Information */}
-              <div className="py-5 border-b border-border lg:border-b-0">
+              {/* Purchase Information */}
+              <div className="py-5">
                 <SectionHeader icon={Receipt} title="Purchase Information" />
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="purchase_price">Purchase Price (EUR) *</Label>
+                    <Label htmlFor="purchase_price">Price (EUR) *</Label>
                     <Input id="purchase_price" type="number" value={form.purchase_price || ""} onChange={(e) => setNumber("purchase_price", e.target.value)} placeholder="65000" min={0} />
                     {errors.purchase_price && <p className="text-xs text-destructive">{errors.purchase_price}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="purchase_date">Purchase Date</Label>
+                    <Label htmlFor="purchase_date">Date</Label>
                     <Input id="purchase_date" type="date" value={form.purchase_date || ""} onChange={(e) => set("purchase_date", e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="purchase_mileage">Mileage at Purchase (km)</Label>
+                    <Label htmlFor="purchase_mileage">Mileage at Purchase</Label>
                     <Input id="purchase_mileage" type="number" value={form.purchase_mileage ?? ""} onChange={(e) => setNumber("purchase_mileage", e.target.value)} placeholder="28000" min={0} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="current_mileage">Current Mileage (km)</Label>
+                    <Label htmlFor="current_mileage">Current Mileage</Label>
                     <Input id="current_mileage" type="number" value={form.current_mileage ?? ""} onChange={(e) => setNumber("current_mileage", e.target.value)} placeholder="32000" min={0} />
                   </div>
                 </div>
               </div>
-
-              {/* Section 4: Additional Details (moved to left column bottom) */}
-              <div className="py-5 lg:pt-5">
-                <SectionHeader icon={FileText} title="Additional Details" optional />
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="vin">VIN</Label>
-                    <Input id="vin" value={form.vin || ""} onChange={(e) => set("vin", e.target.value.toUpperCase())} placeholder="WBSWD9C58AP123456" maxLength={17} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="license_plate">License Plate</Label>
-                    <Input id="license_plate" value={form.license_plate || ""} onChange={(e) => set("license_plate", e.target.value.toUpperCase())} placeholder="M-AB 1234" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Condition</Label>
-                    <Select value={form.condition || ""} onValueChange={(v) => set("condition", v || undefined)}>
-                      <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                      <SelectContent>{CONDITIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-1.5 mt-3">
-                  <Label htmlFor="modifications">Modifications</Label>
-                  <Textarea id="modifications" value={form.modifications || ""} onChange={(e) => set("modifications", e.target.value)} placeholder="e.g. Akrapovic exhaust, KW coilovers..." rows={2} />
-                </div>
-                <div className="space-y-1.5 mt-3">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea id="notes" value={form.notes || ""} onChange={(e) => set("notes", e.target.value)} placeholder="Any additional notes..." rows={2} />
-                </div>
-              </div>
             </div>
 
-            {/* RIGHT COLUMN — Specifications */}
+            {/* COLUMN 2: Specifications */}
             <div className="border-t border-border lg:border-t-0 lg:border-l lg:pl-8 pt-5 lg:pt-0">
               <div className="flex items-center gap-3">
                 <SectionHeader icon={Settings2} title="Specifications" optional />
                 {autoFilled && (
                   <span className="text-xs text-primary flex items-center gap-1 animate-in fade-in duration-300">
-                    <Sparkles className="h-3 w-3" /> Auto-filled from database
+                    <Sparkles className="h-3 w-3" /> Auto-filled
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+              <div className="grid grid-cols-2 gap-3 mt-3">
                 <div className="space-y-1.5">
                   <Label>Fuel Type</Label>
                   <Select value={form.fuel_type || ""} onValueChange={(v) => set("fuel_type", v || undefined)}>
@@ -377,14 +415,14 @@ export function AddVehicleWizard({
                   <Input id="engine_cc" type="number" value={form.engine_displacement_cc ?? ""} onChange={(e) => setNumber("engine_displacement_cc", e.target.value)} placeholder="2998" min={0} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="num_doors">Doors</Label>
+                  <Label>Doors</Label>
                   <Select value={form.num_doors?.toString() || ""} onValueChange={(v) => set("num_doors", v ? Number(v) : undefined)}>
                     <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>{[2, 3, 4, 5].map((n) => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="num_seats">Seats</Label>
+                  <Label>Seats</Label>
                   <Select value={form.num_seats?.toString() || ""} onValueChange={(v) => set("num_seats", v ? Number(v) : undefined)}>
                     <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>{[2, 4, 5, 7, 8, 9].map((n) => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}</SelectContent>
@@ -393,11 +431,41 @@ export function AddVehicleWizard({
               </div>
             </div>
 
+            {/* COLUMN 3: Additional Details */}
+            <div className="border-t border-border lg:border-t-0 lg:border-l lg:pl-8 pt-5 lg:pt-0">
+              <SectionHeader icon={FileText} title="Additional Details" optional />
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="vin">VIN</Label>
+                  <Input id="vin" value={form.vin || ""} onChange={(e) => set("vin", e.target.value.toUpperCase())} placeholder="WBSWD9C58AP..." maxLength={17} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="license_plate">License Plate</Label>
+                  <Input id="license_plate" value={form.license_plate || ""} onChange={(e) => set("license_plate", e.target.value.toUpperCase())} placeholder="M-AB 1234" />
+                </div>
+              </div>
+              <div className="space-y-1.5 mt-3">
+                <Label>Condition</Label>
+                <Select value={form.condition || ""} onValueChange={(v) => set("condition", v || undefined)}>
+                  <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectContent>{CONDITIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 mt-3">
+                <Label htmlFor="modifications">Modifications</Label>
+                <Textarea id="modifications" value={form.modifications || ""} onChange={(e) => set("modifications", e.target.value)} placeholder="e.g. Akrapovic exhaust, KW coilovers..." rows={3} />
+              </div>
+              <div className="space-y-1.5 mt-3">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea id="notes" value={form.notes || ""} onChange={(e) => set("notes", e.target.value)} placeholder="Any additional notes..." rows={3} />
+              </div>
+            </div>
+
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-border bg-background/50 flex items-center justify-end gap-3">
+        <div className="px-8 py-4 border-t border-border bg-background/50 flex items-center justify-end gap-3">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : mode === "add" ? "Add Vehicle" : "Save Changes"}
