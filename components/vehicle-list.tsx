@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TrendingUp, TrendingDown, Eye, Edit, Trash2, Search, Filter, Plus, RefreshCw, Loader2 } from "lucide-react"
+import { TrendingUp, TrendingDown, Eye, Edit, Trash2, Search, Filter, Plus, RefreshCw, Loader2, AlertTriangle } from "lucide-react"
 import { useState, useMemo } from "react"
 import { VehicleDetailsModal } from "./vehicle-details-modal"
 import { AddVehicleWizard } from "./add-vehicle-wizard"
@@ -18,6 +18,8 @@ interface VehicleListProps {
   onUpdate: (id: string, data: PortfolioVehicleUpdate) => Promise<boolean>
   onRefreshValuation: (id: string) => Promise<boolean>
   onAddVehicle: () => void
+  valuatingIds: Set<string>
+  valuationErrors: Map<string, string>
 }
 
 function VehicleCard({
@@ -25,11 +27,15 @@ function VehicleCard({
   onDelete,
   onUpdate,
   onRefreshValuation,
+  isValuating,
+  valuationError,
 }: {
   vehicle: PortfolioVehicle
   onDelete: (id: string) => Promise<boolean>
   onUpdate: (id: string, data: PortfolioVehicleUpdate) => Promise<boolean>
   onRefreshValuation: (id: string) => Promise<boolean>
+  isValuating: boolean
+  valuationError?: string
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
@@ -87,7 +93,27 @@ function VehicleCard({
               <div className="min-w-0">
                 <p className="text-muted-foreground text-xs">Market Value</p>
                 {hasValuation ? (
-                  <p className="font-semibold whitespace-nowrap">€{Math.round(currentVal).toLocaleString()}</p>
+                  <div>
+                    <p className="font-semibold whitespace-nowrap">€{Math.round(currentVal).toLocaleString()}</p>
+                    {isValuating && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Updating...
+                      </p>
+                    )}
+                  </div>
+                ) : isValuating ? (
+                  <p className="font-semibold text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Updating market value...
+                  </p>
+                ) : valuationError ? (
+                  <button
+                    onClick={() => onRefreshValuation(vehicle.id)}
+                    className="flex items-center gap-1 text-amber-500 hover:text-amber-400 transition-colors"
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                    <span className="text-xs font-medium">Retry</span>
+                  </button>
                 ) : (
                   <p className="font-semibold text-muted-foreground whitespace-nowrap flex items-center gap-1">
                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -183,7 +209,7 @@ function VehicleCard({
   )
 }
 
-export function VehicleList({ vehicles, onDelete, onUpdate, onRefreshValuation, onAddVehicle }: VehicleListProps) {
+export function VehicleList({ vehicles, onDelete, onUpdate, onRefreshValuation, onAddVehicle, valuatingIds, valuationErrors }: VehicleListProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedMake, setSelectedMake] = useState("all")
   const [sortBy, setSortBy] = useState("value-desc")
@@ -295,6 +321,8 @@ export function VehicleList({ vehicles, onDelete, onUpdate, onRefreshValuation, 
               onDelete={onDelete}
               onUpdate={onUpdate}
               onRefreshValuation={onRefreshValuation}
+              isValuating={valuatingIds.has(vehicle.id)}
+              valuationError={valuationErrors.get(vehicle.id)}
             />
           ))}
         </div>

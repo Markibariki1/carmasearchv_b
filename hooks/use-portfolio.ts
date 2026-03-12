@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { createBrowserSupabase } from "@/utils/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
 import type { PortfolioVehicle, PortfolioVehicleInsert, PortfolioVehicleUpdate } from "@/types/portfolio"
@@ -10,6 +10,9 @@ export function usePortfolio() {
   const [vehicles, setVehicles] = useState<PortfolioVehicle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [valuatingIds, setValuatingIds] = useState<Set<string>>(new Set())
+  const [valuationErrors, setValuationErrors] = useState<Map<string, string>>(new Map())
+  const valuatingRef = useRef(new Set<string>())
   const { user } = useAuth()
   const supabase = createBrowserSupabase()
 
@@ -113,8 +116,20 @@ export function usePortfolio() {
     async (vehicleId: string): Promise<boolean> => {
       if (!user) return false
 
+      // Guard against concurrent valuations of same vehicle
+      if (valuatingRef.current.has(vehicleId)) return false
+
       const vehicle = vehicles.find((v) => v.id === vehicleId)
       if (!vehicle) return false
+
+      // Track loading state
+      valuatingRef.current.add(vehicleId)
+      setValuatingIds(new Set(valuatingRef.current))
+      setValuationErrors((prev) => {
+        const next = new Map(prev)
+        next.delete(vehicleId)
+        return next
+      })
 
       try {
         const valuation = await getMarketValuation({
@@ -177,7 +192,15 @@ export function usePortfolio() {
 
         return true
       } catch {
+        setValuationErrors((prev) => {
+          const next = new Map(prev)
+          next.set(vehicleId, "Valuation unavailable. Try again later.")
+          return next
+        })
         return false
+      } finally {
+        valuatingRef.current.delete(vehicleId)
+        setValuatingIds(new Set(valuatingRef.current))
       }
     },
     [user, vehicles, supabase],
@@ -207,5 +230,7 @@ export function usePortfolio() {
     updateVehicle,
     deleteVehicle,
     refreshValuation,
+    valuatingIds,
+    valuationErrors,
   }
 }

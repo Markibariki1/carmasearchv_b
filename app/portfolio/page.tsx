@@ -56,7 +56,7 @@ function computeGainPercent(v: PortfolioVehicle): number {
 
 export default function PortfolioPage() {
   const { user, loading: authLoading, isAuthenticated } = useAuth()
-  const { vehicles, loading: portfolioLoading, addVehicle, deleteVehicle, updateVehicle, refreshValuation } = usePortfolio()
+  const { vehicles, loading: portfolioLoading, addVehicle, deleteVehicle, updateVehicle, refreshValuation, valuatingIds, valuationErrors } = usePortfolio()
   const [addVehicleOpen, setAddVehicleOpen] = useState(false)
 
   const loading = authLoading || portfolioLoading
@@ -320,6 +320,8 @@ export default function PortfolioPage() {
               onUpdate={updateVehicle}
               onRefreshValuation={refreshValuation}
               onAddVehicle={() => setAddVehicleOpen(true)}
+              valuatingIds={valuatingIds}
+              valuationErrors={valuationErrors}
             />
 
             {/* Market insights */}
