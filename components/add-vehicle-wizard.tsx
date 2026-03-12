@@ -1,16 +1,12 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { useToast } from "@/hooks/use-toast"
-import { Car, Receipt, Settings2, FileText, Sparkles, ChevronsUpDown, Check } from "lucide-react"
+import { Car, Receipt, Settings2, FileText, Sparkles, X, ChevronDown, Search } from "lucide-react"
 import { useVehicleSpecs } from "@/hooks/use-vehicle-specs"
 import { cn } from "@/lib/utils"
 import {
@@ -41,13 +37,12 @@ function SectionHeader({ icon: Icon, title, optional }: { icon: React.ElementTyp
   )
 }
 
-/** Searchable combobox for Make / Model selection */
+/** Plain HTML searchable dropdown — no radix portals, no conflicts */
 function SearchableSelect({
   value,
   onSelect,
   options,
   placeholder,
-  searchPlaceholder,
   disabled,
   id,
 }: {
@@ -55,51 +50,107 @@ function SearchableSelect({
   onSelect: (value: string) => void
   options: string[]
   placeholder: string
-  searchPlaceholder: string
   disabled?: boolean
   id?: string
 }) {
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const ref = useRef<HTMLDivElement>(null)
+
+  const filtered = search
+    ? options.filter((o) => o.toLowerCase().includes(search.toLowerCase()))
+    : options
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [open])
 
   return (
-    <Popover open={open} onOpenChange={setOpen} modal={false}>
-      <PopoverTrigger asChild>
-        <Button
-          id={id}
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          disabled={disabled}
-          className="w-full justify-between font-normal h-9 px-3"
-        >
-          <span className="truncate">{value || placeholder}</span>
-          <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="z-[100] w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
-        <Command>
-          <CommandInput placeholder={searchPlaceholder} />
-          <CommandList className="max-h-60">
-            <CommandEmpty>No results found.</CommandEmpty>
-            <CommandGroup>
-              {options.map((opt) => (
-                <CommandItem
+    <div ref={ref} className="relative" id={id}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => { setOpen(!open); setSearch("") }}
+        className={cn(
+          "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors",
+          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          disabled && "cursor-not-allowed opacity-50",
+          !value && "text-muted-foreground",
+        )}
+      >
+        <span className="truncate">{value || placeholder}</span>
+        <ChevronDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
+      </button>
+      {open && (
+        <div className="absolute z-[200] mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-lg">
+          <div className="flex items-center border-b px-3 py-2">
+            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="max-h-60 overflow-y-auto p-1">
+            {filtered.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">No results found.</p>
+            ) : (
+              filtered.map((opt) => (
+                <button
                   key={opt}
-                  value={opt}
-                  onSelect={() => {
-                    onSelect(opt)
-                    setOpen(false)
-                  }}
+                  type="button"
+                  onClick={() => { onSelect(opt); setOpen(false); setSearch("") }}
+                  className={cn(
+                    "flex w-full items-center rounded-sm px-2 py-1.5 text-sm cursor-default hover:bg-accent hover:text-accent-foreground",
+                    value === opt && "bg-accent text-accent-foreground",
+                  )}
                 >
-                  <Check className={cn("mr-2 h-4 w-4", value === opt ? "opacity-100" : "opacity-0")} />
                   {opt}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Plain HTML select dropdown — no radix */
+function SimpleSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string
+  onChange: (value: string) => void
+  options: readonly string[] | string[]
+  placeholder: string
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={cn(
+        "flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors",
+        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        !value && "text-muted-foreground",
+      )}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((opt) => (
+        <option key={opt} value={opt}>{opt}</option>
+      ))}
+    </select>
   )
 }
 
@@ -139,9 +190,6 @@ export function AddVehicleWizard({
     power_kw: undefined,
     power_hp: undefined,
     drivetrain: undefined,
-    vin: undefined,
-    license_plate: undefined,
-    condition: undefined,
     modifications: undefined,
     notes: undefined,
     ...initialData,
@@ -161,7 +209,6 @@ export function AddVehicleWizard({
     set(field, val)
   }
 
-  // Auto-convert kW <-> HP
   const setPowerKw = (raw: string) => {
     const kw = raw === "" ? undefined : Number(raw)
     setForm((prev) => ({
@@ -180,14 +227,12 @@ export function AddVehicleWizard({
     }))
   }
 
-  // When make changes, fetch models
   const handleMakeChange = (make: string) => {
     set("make", make)
     set("model", "")
     fetchModels(make)
   }
 
-  // When model or year changes, try to autofill specs
   const tryAutoFill = async (make: string, model: string, year?: number) => {
     const key = `${make}|${model}|${year ?? ""}`
     if (key === lastAutoFillRef.current) return
@@ -216,7 +261,6 @@ export function AddVehicleWizard({
     if (form.make && model) tryAutoFill(form.make, model, form.year)
   }
 
-  // Re-trigger autofill when year changes (if make+model already set)
   useEffect(() => {
     if (form.make && form.model && form.year) {
       tryAutoFill(form.make, form.model, form.year)
@@ -267,56 +311,59 @@ export function AddVehicleWizard({
     }
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
-      <DialogContent
-        className="theme-b max-w-[95vw] xl:max-w-7xl max-h-[85vh] overflow-hidden p-0 bg-background text-foreground"
-        onPointerDownOutside={(e) => {
-          // Don't close when clicking dropdown portals (they render outside DialogContent)
-          const target = e.target as HTMLElement
-          if (target.closest("[data-radix-popper-content-wrapper]") || target.closest("[data-radix-select-viewport]")) {
-            e.preventDefault()
-            return
-          }
-        }}
-      >
-        <DialogHeader className="px-8 pt-6 pb-2">
-          <DialogTitle className="text-xl font-bold">
-            {mode === "add" ? "Add Vehicle" : "Edit Vehicle"}
-          </DialogTitle>
-        </DialogHeader>
+  // Lock body scroll when open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden"
+      return () => { document.body.style.overflow = "" }
+    }
+  }, [open])
 
-        {/* Scrollable form — three-column layout */}
+  if (!open) return null
+
+  return (
+    <div className="theme-b fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/50" onClick={() => onOpenChange(false)} />
+
+      {/* Panel */}
+      <div className="relative z-10 w-[95vw] xl:max-w-7xl max-h-[85vh] overflow-hidden rounded-lg border bg-background text-foreground shadow-lg">
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 pt-6 pb-3">
+          <h2 className="text-xl font-bold">{mode === "add" ? "Add Vehicle" : "Edit Vehicle"}</h2>
+          <button onClick={() => onOpenChange(false)} className="rounded-sm opacity-70 hover:opacity-100 transition-opacity">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Scrollable form */}
         <div className="overflow-y-auto px-8 pb-2" style={{ maxHeight: "calc(85vh - 140px)" }}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-0">
 
             {/* COLUMN 1: Vehicle Identity + Purchase Info */}
             <div>
-              {/* Vehicle Identity */}
               <div className="pb-5 border-b border-border">
                 <SectionHeader icon={Car} title="Vehicle Identity" />
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="make">Make *</Label>
+                    <Label>Make *</Label>
                     <SearchableSelect
                       id="make"
                       value={form.make || ""}
                       onSelect={handleMakeChange}
                       options={makes}
                       placeholder="Select make..."
-                      searchPlaceholder="Search makes..."
                     />
                     {errors.make && <p className="text-xs text-destructive">{errors.make}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="model">Model *</Label>
+                    <Label>Model *</Label>
                     <SearchableSelect
                       id="model"
                       value={form.model || ""}
                       onSelect={handleModelChange}
                       options={models}
                       placeholder={form.make ? "Select model..." : "Select make first"}
-                      searchPlaceholder="Search models..."
                       disabled={!form.make}
                     />
                     {errors.model && <p className="text-xs text-destructive">{errors.model}</p>}
@@ -333,7 +380,6 @@ export function AddVehicleWizard({
                 </div>
               </div>
 
-              {/* Purchase Information */}
               <div className="py-5">
                 <SectionHeader icon={Receipt} title="Purchase Information" />
                 <div className="grid grid-cols-2 gap-3 mt-3">
@@ -371,45 +417,27 @@ export function AddVehicleWizard({
               <div className="grid grid-cols-2 gap-3 mt-3">
                 <div className="space-y-1.5">
                   <Label>Fuel Type</Label>
-                  <Select value={form.fuel_type || ""} onValueChange={(v) => set("fuel_type", v || undefined)}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>{FUEL_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SimpleSelect value={form.fuel_type || ""} onChange={(v) => set("fuel_type", v || undefined)} options={FUEL_TYPES} placeholder="Select..." />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Transmission</Label>
-                  <Select value={form.transmission || ""} onValueChange={(v) => set("transmission", v || undefined)}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>{TRANSMISSIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SimpleSelect value={form.transmission || ""} onChange={(v) => set("transmission", v || undefined)} options={TRANSMISSIONS} placeholder="Select..." />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Body Type</Label>
-                  <Select value={form.body_type || ""} onValueChange={(v) => set("body_type", v || undefined)}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>{BODY_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SimpleSelect value={form.body_type || ""} onChange={(v) => set("body_type", v || undefined)} options={BODY_TYPES} placeholder="Select..." />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Drivetrain</Label>
-                  <Select value={form.drivetrain || ""} onValueChange={(v) => set("drivetrain", v || undefined)}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>{DRIVETRAINS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SimpleSelect value={form.drivetrain || ""} onChange={(v) => set("drivetrain", v || undefined)} options={DRIVETRAINS} placeholder="Select..." />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Exterior Color</Label>
-                  <Select value={form.exterior_color || ""} onValueChange={(v) => set("exterior_color", v || undefined)}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>{EXTERIOR_COLORS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SimpleSelect value={form.exterior_color || ""} onChange={(v) => set("exterior_color", v || undefined)} options={EXTERIOR_COLORS} placeholder="Select..." />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Interior Color</Label>
-                  <Select value={form.interior_color || ""} onValueChange={(v) => set("interior_color", v || undefined)}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>{INTERIOR_COLORS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SimpleSelect value={form.interior_color || ""} onChange={(v) => set("interior_color", v || undefined)} options={INTERIOR_COLORS} placeholder="Select..." />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="power_kw">Power (kW)</Label>
@@ -425,17 +453,11 @@ export function AddVehicleWizard({
                 </div>
                 <div className="space-y-1.5">
                   <Label>Doors</Label>
-                  <Select value={form.num_doors?.toString() || ""} onValueChange={(v) => set("num_doors", v ? Number(v) : undefined)}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>{[2, 3, 4, 5].map((n) => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SimpleSelect value={form.num_doors?.toString() || ""} onChange={(v) => set("num_doors", v ? Number(v) : undefined)} options={["2","3","4","5"]} placeholder="Select..." />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Seats</Label>
-                  <Select value={form.num_seats?.toString() || ""} onValueChange={(v) => set("num_seats", v ? Number(v) : undefined)}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>{[2, 4, 5, 7, 8, 9].map((n) => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SimpleSelect value={form.num_seats?.toString() || ""} onChange={(v) => set("num_seats", v ? Number(v) : undefined)} options={["2","4","5","7","8","9"]} placeholder="Select..." />
                 </div>
               </div>
             </div>
@@ -463,7 +485,7 @@ export function AddVehicleWizard({
             {isSubmitting ? "Saving..." : mode === "add" ? "Add Vehicle" : "Save Changes"}
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   )
 }
