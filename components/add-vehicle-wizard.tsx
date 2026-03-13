@@ -74,31 +74,31 @@ function SearchableCombobox({
         disabled={disabled}
         onClick={() => { setOpen(!open); setSearch("") }}
         className={cn(
-          "flex h-10 w-full items-center justify-between rounded-lg border bg-white px-3 text-sm transition-all",
-          "hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
-          open && "ring-2 ring-primary/20 border-primary",
-          disabled && "cursor-not-allowed opacity-50 bg-muted",
-          !value && "text-muted-foreground",
+          "flex h-10 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 transition-all",
+          "hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500",
+          open && "ring-2 ring-blue-100 border-blue-500",
+          disabled && "cursor-not-allowed opacity-50 bg-gray-100",
+          !value && "!text-gray-400",
         )}
       >
         <span className="truncate">{value || placeholder}</span>
-        <ChevronDown className={cn("ml-2 h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
+        <ChevronDown className={cn("ml-2 h-4 w-4 shrink-0 text-gray-400 transition-transform", open && "rotate-180")} />
       </button>
       {open && (
-        <div className="absolute z-[200] mt-1.5 w-full rounded-lg border bg-white shadow-xl shadow-black/5 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-          <div className="flex items-center gap-2 border-b px-3 py-2.5">
-            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="absolute z-[200] mt-1.5 w-full rounded-lg border border-gray-200 bg-white shadow-xl shadow-black/8 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="flex items-center gap-2 border-b border-gray-200 px-3 py-2.5">
+            <Search className="h-4 w-4 shrink-0 text-gray-400" />
             <input
               ref={inputRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Type to search..."
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              className="flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
             />
           </div>
           <div className="max-h-56 overflow-y-auto overscroll-contain py-1">
             {filtered.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">No results found.</p>
+              <p className="py-6 text-center text-sm text-gray-400">No results found.</p>
             ) : (
               filtered.map((opt) => (
                 <button
@@ -106,12 +106,12 @@ function SearchableCombobox({
                   type="button"
                   onClick={() => { onSelect(opt); setOpen(false); setSearch("") }}
                   className={cn(
-                    "flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors",
-                    "hover:bg-primary/5",
-                    value === opt && "bg-primary/5 text-primary font-medium",
+                    "flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors",
+                    "hover:bg-blue-50 hover:text-gray-900",
+                    value === opt && "bg-blue-50 !text-blue-600 font-medium",
                   )}
                 >
-                  <Check className={cn("h-3.5 w-3.5 shrink-0", value === opt ? "opacity-100 text-primary" : "opacity-0")} />
+                  <Check className={cn("h-3.5 w-3.5 shrink-0", value === opt ? "opacity-100 text-blue-600" : "opacity-0")} />
                   {opt}
                 </button>
               ))
@@ -155,17 +155,17 @@ function StyledSelect({
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "flex h-10 w-full items-center justify-between rounded-lg border bg-white px-3 text-sm transition-all",
-          "hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
-          open && "ring-2 ring-primary/20 border-primary",
-          !value && "text-muted-foreground",
+          "flex h-10 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 transition-all",
+          "hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500",
+          open && "ring-2 ring-blue-100 border-blue-500",
+          !value && "!text-gray-400",
         )}
       >
         <span className="truncate">{value || placeholder}</span>
-        <ChevronDown className={cn("ml-2 h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
+        <ChevronDown className={cn("ml-2 h-4 w-4 shrink-0 text-gray-400 transition-transform", open && "rotate-180")} />
       </button>
       {open && (
-        <div className="absolute z-[200] mt-1.5 w-full rounded-lg border bg-white shadow-xl shadow-black/5 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="absolute z-[200] mt-1.5 w-full rounded-lg border border-gray-200 bg-white shadow-xl shadow-black/8 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
           <div className="max-h-56 overflow-y-auto overscroll-contain py-1">
             {options.map((opt) => (
               <button
@@ -173,12 +173,12 @@ function StyledSelect({
                 type="button"
                 onClick={() => { onChange(opt); setOpen(false) }}
                 className={cn(
-                  "flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors",
-                  "hover:bg-primary/5",
-                  value === opt && "bg-primary/5 text-primary font-medium",
+                  "flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors",
+                  "hover:bg-blue-50 hover:text-gray-900",
+                  value === opt && "bg-blue-50 !text-blue-600 font-medium",
                 )}
               >
-                <Check className={cn("h-3.5 w-3.5 shrink-0", value === opt ? "opacity-100 text-primary" : "opacity-0")} />
+                <Check className={cn("h-3.5 w-3.5 shrink-0", value === opt ? "opacity-100 text-blue-600" : "opacity-0")} />
                 {opt}
               </button>
             ))}
@@ -337,8 +337,8 @@ export function AddVehicleWizard({
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-5 border-b bg-gradient-to-r from-primary/5 to-transparent">
           <div>
-            <h2 className="text-xl font-bold tracking-tight">{mode === "add" ? "Add Vehicle to Portfolio" : "Edit Vehicle"}</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">Fill in the details below. Specifications auto-fill when you select a make and model.</p>
+            <h2 className="text-xl font-bold tracking-tight text-gray-900">{mode === "add" ? "Add Vehicle to Portfolio" : "Edit Vehicle"}</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Fill in the details below. Specifications auto-fill when you select a make and model.</p>
           </div>
           <button onClick={() => onOpenChange(false)} className="rounded-full p-2 hover:bg-muted transition-colors">
             <X className="h-5 w-5" />
@@ -353,13 +353,13 @@ export function AddVehicleWizard({
             <div className="p-8 space-y-8">
               {/* Vehicle Identity */}
               <section>
-                <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <span className="h-1 w-1 rounded-full bg-primary" />
                   Vehicle Identity
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Make <span className="text-destructive">*</span></Label>
+                    <Label className="text-xs font-medium text-gray-600">Make <span className="text-destructive">*</span></Label>
                     <SearchableCombobox
                       id="make"
                       value={form.make || ""}
@@ -371,7 +371,7 @@ export function AddVehicleWizard({
                     {errors.make && <p className="text-xs text-destructive">{errors.make}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Model <span className="text-destructive">*</span></Label>
+                    <Label className="text-xs font-medium text-gray-600">Model <span className="text-destructive">*</span></Label>
                     <SearchableCombobox
                       id="model"
                       value={form.model || ""}
@@ -383,12 +383,12 @@ export function AddVehicleWizard({
                     {errors.model && <p className="text-xs text-destructive">{errors.model}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Year <span className="text-destructive">*</span></Label>
+                    <Label className="text-xs font-medium text-gray-600">Year <span className="text-destructive">*</span></Label>
                     <Input id="year" type="number" value={form.year || ""} onChange={(e) => setNumber("year", e.target.value)} placeholder="2023" min={1900} max={currentYear + 1} className="h-10 rounded-lg" />
                     {errors.year && <p className="text-xs text-destructive">{errors.year}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Trim / Variant</Label>
+                    <Label className="text-xs font-medium text-gray-600">Trim / Variant</Label>
                     <Input id="trim" value={form.trim || ""} onChange={(e) => set("trim", e.target.value)} placeholder="e.g. Competition" className="h-10 rounded-lg" />
                   </div>
                 </div>
@@ -396,26 +396,26 @@ export function AddVehicleWizard({
 
               {/* Purchase Information */}
               <section>
-                <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <span className="h-1 w-1 rounded-full bg-primary" />
                   Purchase Information
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Price (EUR) <span className="text-destructive">*</span></Label>
+                    <Label className="text-xs font-medium text-gray-600">Price (EUR) <span className="text-destructive">*</span></Label>
                     <Input id="purchase_price" type="number" value={form.purchase_price || ""} onChange={(e) => setNumber("purchase_price", e.target.value)} placeholder="65,000" min={0} className="h-10 rounded-lg" />
                     {errors.purchase_price && <p className="text-xs text-destructive">{errors.purchase_price}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Purchase Date</Label>
+                    <Label className="text-xs font-medium text-gray-600">Purchase Date</Label>
                     <Input id="purchase_date" type="date" value={form.purchase_date || ""} onChange={(e) => set("purchase_date", e.target.value)} className="h-10 rounded-lg" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Mileage at Purchase (km)</Label>
+                    <Label className="text-xs font-medium text-gray-600">Mileage at Purchase (km)</Label>
                     <Input id="purchase_mileage" type="number" value={form.purchase_mileage ?? ""} onChange={(e) => setNumber("purchase_mileage", e.target.value)} placeholder="28,000" min={0} className="h-10 rounded-lg" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Current Mileage (km)</Label>
+                    <Label className="text-xs font-medium text-gray-600">Current Mileage (km)</Label>
                     <Input id="current_mileage" type="number" value={form.current_mileage ?? ""} onChange={(e) => setNumber("current_mileage", e.target.value)} placeholder="32,000" min={0} className="h-10 rounded-lg" />
                   </div>
                 </div>
@@ -423,18 +423,18 @@ export function AddVehicleWizard({
 
               {/* Notes */}
               <section>
-                <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                  <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="h-1 w-1 rounded-full bg-gray-300" />
                   Notes
-                  <span className="text-xs font-normal text-muted-foreground">— Optional</span>
+                  <span className="text-xs font-normal text-gray-400">— Optional</span>
                 </h3>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Modifications</Label>
+                    <Label className="text-xs font-medium text-gray-600">Modifications</Label>
                     <Textarea id="modifications" value={form.modifications || ""} onChange={(e) => set("modifications", e.target.value)} placeholder="e.g. Akrapovic exhaust, KW coilovers..." rows={2} className="rounded-lg resize-none" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Additional Notes</Label>
+                    <Label className="text-xs font-medium text-gray-600">Additional Notes</Label>
                     <Textarea id="notes" value={form.notes || ""} onChange={(e) => set("notes", e.target.value)} placeholder="Any additional notes..." rows={2} className="rounded-lg resize-none" />
                   </div>
                 </div>
@@ -444,10 +444,10 @@ export function AddVehicleWizard({
             {/* RIGHT SIDE — Specifications */}
             <div className="p-8 bg-muted/30 border-l space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                   <span className="h-1 w-1 rounded-full bg-primary" />
                   Specifications
-                  <span className="text-xs font-normal text-muted-foreground">— Optional</span>
+                  <span className="text-xs font-normal text-gray-400">— Optional</span>
                 </h3>
                 {autoFilled && (
                   <span className="text-xs text-primary flex items-center gap-1.5 bg-primary/10 px-2.5 py-1 rounded-full font-medium animate-in fade-in duration-300">
@@ -458,44 +458,44 @@ export function AddVehicleWizard({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Fuel Type</Label>
+                  <Label className="text-xs font-medium text-gray-600">Fuel Type</Label>
                   <StyledSelect value={form.fuel_type || ""} onChange={(v) => set("fuel_type", v || undefined)} options={FUEL_TYPES} placeholder="Select..." />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Transmission</Label>
+                  <Label className="text-xs font-medium text-gray-600">Transmission</Label>
                   <StyledSelect value={form.transmission || ""} onChange={(v) => set("transmission", v || undefined)} options={TRANSMISSIONS} placeholder="Select..." />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Body Type</Label>
+                  <Label className="text-xs font-medium text-gray-600">Body Type</Label>
                   <StyledSelect value={form.body_type || ""} onChange={(v) => set("body_type", v || undefined)} options={BODY_TYPES} placeholder="Select..." />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Drivetrain</Label>
+                  <Label className="text-xs font-medium text-gray-600">Drivetrain</Label>
                   <StyledSelect value={form.drivetrain || ""} onChange={(v) => set("drivetrain", v || undefined)} options={DRIVETRAINS} placeholder="Select..." />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Exterior Color</Label>
+                  <Label className="text-xs font-medium text-gray-600">Exterior Color</Label>
                   <StyledSelect value={form.exterior_color || ""} onChange={(v) => set("exterior_color", v || undefined)} options={EXTERIOR_COLORS} placeholder="Select..." />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Interior Color</Label>
+                  <Label className="text-xs font-medium text-gray-600">Interior Color</Label>
                   <StyledSelect value={form.interior_color || ""} onChange={(v) => set("interior_color", v || undefined)} options={INTERIOR_COLORS} placeholder="Select..." />
                 </div>
               </div>
 
               <div className="border-t pt-6">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Engine & Performance</h4>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Engine & Performance</h4>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Power (kW)</Label>
+                    <Label className="text-xs font-medium text-gray-600">Power (kW)</Label>
                     <Input id="power_kw" type="number" value={form.power_kw ?? ""} onChange={(e) => setPowerKw(e.target.value)} placeholder="331" min={0} className="h-10 rounded-lg" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Power (HP)</Label>
+                    <Label className="text-xs font-medium text-gray-600">Power (HP)</Label>
                     <Input id="power_hp" type="number" value={form.power_hp ?? ""} onChange={(e) => setPowerHp(e.target.value)} placeholder="450" min={0} className="h-10 rounded-lg" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Engine (cc)</Label>
+                    <Label className="text-xs font-medium text-gray-600">Engine (cc)</Label>
                     <Input id="engine_cc" type="number" value={form.engine_displacement_cc ?? ""} onChange={(e) => setNumber("engine_displacement_cc", e.target.value)} placeholder="2998" min={0} className="h-10 rounded-lg" />
                   </div>
                 </div>
@@ -503,11 +503,11 @@ export function AddVehicleWizard({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Doors</Label>
+                  <Label className="text-xs font-medium text-gray-600">Doors</Label>
                   <StyledSelect value={form.num_doors?.toString() || ""} onChange={(v) => set("num_doors", v ? Number(v) : undefined)} options={["2","3","4","5"]} placeholder="Select..." />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Seats</Label>
+                  <Label className="text-xs font-medium text-gray-600">Seats</Label>
                   <StyledSelect value={form.num_seats?.toString() || ""} onChange={(v) => set("num_seats", v ? Number(v) : undefined)} options={["2","4","5","7","8","9"]} placeholder="Select..." />
                 </div>
               </div>
