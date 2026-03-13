@@ -20,27 +20,24 @@ export function useVehicleSpecs() {
   const [loadingMakes, setLoadingMakes] = useState(false)
   const [loadingModels, setLoadingModels] = useState(false)
 
-  // Fetch all distinct makes on mount
+  // Fetch all distinct makes via RPC
   useEffect(() => {
     let cancelled = false
     setLoadingMakes(true)
     const supabase = createBrowserSupabase()
     supabase
-      .from("vehicle_specs")
-      .select("make")
-      .order("make")
+      .rpc("get_distinct_makes")
       .then(({ data }) => {
         if (cancelled) return
         if (data) {
-          const unique = [...new Set(data.map((r: { make: string }) => r.make))].sort()
-          setMakes(unique)
+          setMakes(data.map((r: { make: string }) => r.make))
         }
         setLoadingMakes(false)
       })
     return () => { cancelled = true }
   }, [])
 
-  // Fetch models for a given make
+  // Fetch models for a given make via RPC
   const fetchModels = useCallback((make: string) => {
     if (!make) {
       setModels([])
@@ -49,14 +46,10 @@ export function useVehicleSpecs() {
     setLoadingModels(true)
     const supabase = createBrowserSupabase()
     supabase
-      .from("vehicle_specs")
-      .select("model")
-      .eq("make", make)
-      .order("model")
+      .rpc("get_models_for_make", { p_make: make })
       .then(({ data }) => {
         if (data) {
-          const unique = [...new Set(data.map((r: { model: string }) => r.model))].sort()
-          setModels(unique)
+          setModels(data.map((r: { model: string }) => r.model))
         }
         setLoadingModels(false)
       })
@@ -67,7 +60,6 @@ export function useVehicleSpecs() {
     if (!make || !model) return null
     const supabase = createBrowserSupabase()
 
-    // Try exact year match first
     if (year) {
       const { data } = await supabase
         .from("vehicle_specs")
@@ -79,7 +71,6 @@ export function useVehicleSpecs() {
       if (data && data.length > 0) return data[0] as VehicleSpec
     }
 
-    // Fall back to any year for this make+model
     const { data } = await supabase
       .from("vehicle_specs")
       .select("fuel_type,transmission,drive,engine_displacement,cylinders,vehicle_size_class,turbo,supercharged")
