@@ -79,7 +79,15 @@ _FUEL_NORM_MAP = {
 def _norm_lookup(value: Optional[str], mapping: dict) -> Optional[str]:
     if not value:
         return None
-    return mapping.get(value.lower().strip())
+    v = value.lower().strip()
+    # Exact match
+    if v in mapping:
+        return mapping[v]
+    # Prefix match for variants like "Automatic (AM-S8)" → "automatic"
+    for key, norm in mapping.items():
+        if v.startswith(key):
+            return norm
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +173,7 @@ def valuation_endpoint():
     if body_norm and trans_norm and fuel_norm:
         attempts.append((
             "strict",
-            "make = %s AND model = %s AND body_type_norm = %s "
+            "LOWER(make) = LOWER(%s) AND LOWER(model) = LOWER(%s) AND body_type_norm = %s "
             "AND transmission_norm = %s AND fuel_type_norm = %s",
             [make, model, body_norm, trans_norm, fuel_norm],
         ))
@@ -173,13 +181,13 @@ def valuation_endpoint():
     if body_norm and trans_norm:
         attempts.append((
             "no_fuel",
-            "make = %s AND model = %s AND body_type_norm = %s AND transmission_norm = %s",
+            "LOWER(make) = LOWER(%s) AND LOWER(model) = LOWER(%s) AND body_type_norm = %s AND transmission_norm = %s",
             [make, model, body_norm, trans_norm],
         ))
 
     attempts.append((
         "make_model_only",
-        "make = %s AND model = %s",
+        "LOWER(make) = LOWER(%s) AND LOWER(model) = LOWER(%s)",
         [make, model],
     ))
 
@@ -247,11 +255,14 @@ def valuation_endpoint():
         if p is None or p <= 0:
             continue
 
-        # Only include vehicles within ±5 years of target
-        if y is not None and abs(y - year) <= 5:
-            valid_prices.append(p)
-            if m is not None and m >= 0:
-                regression_data.append((p, y, m))
+        # Exclude only when year IS known and outside ±5 range.
+        # Unknown year → still include in price stats (just not in regression).
+        if y is not None and abs(y - year) > 5:
+            continue
+
+        valid_prices.append(p)
+        if y is not None and m is not None and m >= 0:
+            regression_data.append((p, y, m))
 
     if not valid_prices:
         return jsonify({**_EMPTY_RESULT, "attempt": attempt_used}), 200

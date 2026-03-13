@@ -143,7 +143,14 @@ export function usePortfolio() {
           power_kw: vehicle.power_kw ?? undefined,
         })
 
-        if (valuation.sample_size === 0) return false
+        if (valuation.sample_size === 0) {
+          setValuationErrors((prev) => {
+            const next = new Map(prev)
+            next.set(vehicleId, "No comparable vehicles found in the market.")
+            return next
+          })
+          return false
+        }
 
         const now = new Date().toISOString()
 

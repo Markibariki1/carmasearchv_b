@@ -159,6 +159,12 @@ _INDEXES: List[Tuple[str, str]] = [
                ON vehicle_marketplace.vehicle_data (year_extracted)
                WHERE is_vehicle_available = true AND year_extracted > 0""",
     ),
+    (
+        "idx_vd_lower_make_model",
+        """CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_vd_lower_make_model
+               ON vehicle_marketplace.vehicle_data (LOWER(make), LOWER(model))
+               WHERE is_vehicle_available = true""",
+    ),
 ]
 
 
