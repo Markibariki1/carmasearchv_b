@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { X, ChevronDown, Search, Sparkles, Check, Loader2 } from "lucide-react"
 import { useVehicleSpecs } from "@/hooks/use-vehicle-specs"
@@ -106,13 +105,13 @@ function SearchableCombobox({
                   type="button"
                   onClick={() => { onSelect(opt); setOpen(false); setSearch("") }}
                   className={cn(
-                    "flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors",
+                    "flex w-full items-center px-3 py-2 text-sm text-gray-700 transition-colors text-left",
                     "hover:bg-blue-50 hover:text-gray-900",
                     value === opt && "bg-blue-50 !text-blue-600 font-medium",
                   )}
                 >
-                  <Check className={cn("h-3.5 w-3.5 shrink-0", value === opt ? "opacity-100 text-blue-600" : "opacity-0")} />
-                  {opt}
+                  {value === opt && <Check className="h-3.5 w-3.5 shrink-0 mr-2 text-blue-600" />}
+                  <span className="truncate">{opt}</span>
                 </button>
               ))
             )}
@@ -173,13 +172,13 @@ function StyledSelect({
                 type="button"
                 onClick={() => { onChange(opt); setOpen(false) }}
                 className={cn(
-                  "flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors",
+                  "flex w-full items-center px-3 py-2 text-sm text-gray-700 transition-colors text-left",
                   "hover:bg-blue-50 hover:text-gray-900",
                   value === opt && "bg-blue-50 !text-blue-600 font-medium",
                 )}
               >
-                <Check className={cn("h-3.5 w-3.5 shrink-0", value === opt ? "opacity-100 text-blue-600" : "opacity-0")} />
-                {opt}
+                {value === opt && <Check className="h-3.5 w-3.5 shrink-0 mr-2 text-blue-600" />}
+                <span className="truncate">{opt}</span>
               </button>
             ))}
           </div>
@@ -211,9 +210,9 @@ export function AddVehicleWizard({
   const [form, setForm] = useState<Partial<PortfolioVehicleInsert>>({
     make: "",
     model: "",
-    year: currentYear,
+    year: undefined,
     trim: "",
-    purchase_price: 0,
+    purchase_price: undefined,
     purchase_date: new Date().toISOString().split("T")[0],
     purchase_mileage: undefined,
     current_mileage: undefined,
@@ -228,8 +227,6 @@ export function AddVehicleWizard({
     power_kw: undefined,
     power_hp: undefined,
     drivetrain: undefined,
-    modifications: undefined,
-    notes: undefined,
     ...initialData,
   })
 
@@ -309,7 +306,7 @@ export function AddVehicleWizard({
         description: `${form.year} ${form.make} ${form.model} has been ${mode === "add" ? "added to" : "updated in"} your portfolio.`,
       })
       onOpenChange(false)
-      setForm({ make: "", model: "", year: currentYear, trim: "", purchase_price: 0, purchase_date: new Date().toISOString().split("T")[0] })
+      setForm({ make: "", model: "", year: undefined, trim: "", purchase_price: undefined, purchase_date: new Date().toISOString().split("T")[0] })
     } catch (err: any) {
       toast({ title: "Error", description: err?.message || "Something went wrong.", variant: "destructive" })
     } finally {
@@ -335,13 +332,13 @@ export function AddVehicleWizard({
       <div className="relative z-10 w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-2xl border bg-white shadow-2xl">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-5 border-b bg-gradient-to-r from-primary/5 to-transparent">
+        <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50/50 to-transparent">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-gray-900">{mode === "add" ? "Add Vehicle to Portfolio" : "Edit Vehicle"}</h2>
             <p className="text-sm text-gray-500 mt-0.5">Fill in the details below. Specifications auto-fill when you select a make and model.</p>
           </div>
-          <button onClick={() => onOpenChange(false)} className="rounded-full p-2 hover:bg-muted transition-colors">
-            <X className="h-5 w-5" />
+          <button onClick={() => onOpenChange(false)} className="rounded-full p-2 hover:bg-gray-100 transition-colors">
+            <X className="h-5 w-5 text-gray-500" />
           </button>
         </div>
 
@@ -354,12 +351,12 @@ export function AddVehicleWizard({
               {/* Vehicle Identity */}
               <section>
                 <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <span className="h-1 w-1 rounded-full bg-primary" />
+                  <span className="h-1 w-1 rounded-full bg-blue-600" />
                   Vehicle Identity
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-gray-600">Make <span className="text-destructive">*</span></Label>
+                    <Label className="text-xs font-medium text-gray-600">Make <span className="text-red-500">*</span></Label>
                     <SearchableCombobox
                       id="make"
                       value={form.make || ""}
@@ -368,10 +365,10 @@ export function AddVehicleWizard({
                       placeholder={loadingMakes ? "Loading..." : "Select make"}
                       disabled={loadingMakes}
                     />
-                    {errors.make && <p className="text-xs text-destructive">{errors.make}</p>}
+                    {errors.make && <p className="text-xs text-red-500">{errors.make}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-gray-600">Model <span className="text-destructive">*</span></Label>
+                    <Label className="text-xs font-medium text-gray-600">Model <span className="text-red-500">*</span></Label>
                     <SearchableCombobox
                       id="model"
                       value={form.model || ""}
@@ -380,16 +377,16 @@ export function AddVehicleWizard({
                       placeholder={!form.make ? "Select make first" : "Select model"}
                       disabled={!form.make}
                     />
-                    {errors.model && <p className="text-xs text-destructive">{errors.model}</p>}
+                    {errors.model && <p className="text-xs text-red-500">{errors.model}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-gray-600">Year <span className="text-destructive">*</span></Label>
-                    <Input id="year" type="number" value={form.year || ""} onChange={(e) => setNumber("year", e.target.value)} placeholder="2023" min={1900} max={currentYear + 1} className="h-10 rounded-lg" />
-                    {errors.year && <p className="text-xs text-destructive">{errors.year}</p>}
+                    <Label className="text-xs font-medium text-gray-600">Year <span className="text-red-500">*</span></Label>
+                    <Input id="year" type="text" inputMode="numeric" value={form.year ?? ""} onChange={(e) => setNumber("year", e.target.value.replace(/\D/g, ""))} placeholder="e.g. 2023" className="h-10 rounded-lg text-gray-900" />
+                    {errors.year && <p className="text-xs text-red-500">{errors.year}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-gray-600">Trim / Variant</Label>
-                    <Input id="trim" value={form.trim || ""} onChange={(e) => set("trim", e.target.value)} placeholder="e.g. Competition" className="h-10 rounded-lg" />
+                    <Input id="trim" value={form.trim || ""} onChange={(e) => set("trim", e.target.value)} placeholder="e.g. Competition" className="h-10 rounded-lg text-gray-900" />
                   </div>
                 </div>
               </section>
@@ -397,60 +394,42 @@ export function AddVehicleWizard({
               {/* Purchase Information */}
               <section>
                 <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <span className="h-1 w-1 rounded-full bg-primary" />
+                  <span className="h-1 w-1 rounded-full bg-blue-600" />
                   Purchase Information
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-gray-600">Price (EUR) <span className="text-destructive">*</span></Label>
-                    <Input id="purchase_price" type="number" value={form.purchase_price || ""} onChange={(e) => setNumber("purchase_price", e.target.value)} placeholder="65,000" min={0} className="h-10 rounded-lg" />
-                    {errors.purchase_price && <p className="text-xs text-destructive">{errors.purchase_price}</p>}
+                    <Label className="text-xs font-medium text-gray-600">Price (EUR) <span className="text-red-500">*</span></Label>
+                    <Input id="purchase_price" type="text" inputMode="numeric" value={form.purchase_price ?? ""} onChange={(e) => setNumber("purchase_price", e.target.value.replace(/\D/g, ""))} placeholder="e.g. 65000" className="h-10 rounded-lg text-gray-900" />
+                    {errors.purchase_price && <p className="text-xs text-red-500">{errors.purchase_price}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-gray-600">Purchase Date</Label>
-                    <Input id="purchase_date" type="date" value={form.purchase_date || ""} onChange={(e) => set("purchase_date", e.target.value)} className="h-10 rounded-lg" />
+                    <Input id="purchase_date" type="date" value={form.purchase_date || ""} onChange={(e) => set("purchase_date", e.target.value)} className="h-10 rounded-lg text-gray-900" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-gray-600">Mileage at Purchase (km)</Label>
-                    <Input id="purchase_mileage" type="number" value={form.purchase_mileage ?? ""} onChange={(e) => setNumber("purchase_mileage", e.target.value)} placeholder="28,000" min={0} className="h-10 rounded-lg" />
+                    <Input id="purchase_mileage" type="text" inputMode="numeric" value={form.purchase_mileage ?? ""} onChange={(e) => setNumber("purchase_mileage", e.target.value.replace(/\D/g, ""))} placeholder="e.g. 28000" className="h-10 rounded-lg text-gray-900" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-gray-600">Current Mileage (km)</Label>
-                    <Input id="current_mileage" type="number" value={form.current_mileage ?? ""} onChange={(e) => setNumber("current_mileage", e.target.value)} placeholder="32,000" min={0} className="h-10 rounded-lg" />
+                    <Input id="current_mileage" type="text" inputMode="numeric" value={form.current_mileage ?? ""} onChange={(e) => setNumber("current_mileage", e.target.value.replace(/\D/g, ""))} placeholder="e.g. 32000" className="h-10 rounded-lg text-gray-900" />
                   </div>
                 </div>
               </section>
 
-              {/* Notes */}
-              <section>
-                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <span className="h-1 w-1 rounded-full bg-gray-300" />
-                  Notes
-                  <span className="text-xs font-normal text-gray-400">— Optional</span>
-                </h3>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-medium text-gray-600">Modifications</Label>
-                    <Textarea id="modifications" value={form.modifications || ""} onChange={(e) => set("modifications", e.target.value)} placeholder="e.g. Akrapovic exhaust, KW coilovers..." rows={2} className="rounded-lg resize-none" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-medium text-gray-600">Additional Notes</Label>
-                    <Textarea id="notes" value={form.notes || ""} onChange={(e) => set("notes", e.target.value)} placeholder="Any additional notes..." rows={2} className="rounded-lg resize-none" />
-                  </div>
-                </div>
-              </section>
             </div>
 
             {/* RIGHT SIDE — Specifications */}
-            <div className="p-8 bg-muted/30 border-l space-y-6">
+            <div className="p-8 bg-gray-50/60 border-l space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                  <span className="h-1 w-1 rounded-full bg-primary" />
+                  <span className="h-1 w-1 rounded-full bg-blue-600" />
                   Specifications
                   <span className="text-xs font-normal text-gray-400">— Optional</span>
                 </h3>
                 {autoFilled && (
-                  <span className="text-xs text-primary flex items-center gap-1.5 bg-primary/10 px-2.5 py-1 rounded-full font-medium animate-in fade-in duration-300">
+                  <span className="text-xs text-blue-600 flex items-center gap-1.5 bg-blue-50 px-2.5 py-1 rounded-full font-medium animate-in fade-in duration-300">
                     <Sparkles className="h-3 w-3" /> Auto-filled
                   </span>
                 )}
@@ -488,15 +467,15 @@ export function AddVehicleWizard({
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-gray-600">Power (kW)</Label>
-                    <Input id="power_kw" type="number" value={form.power_kw ?? ""} onChange={(e) => setPowerKw(e.target.value)} placeholder="331" min={0} className="h-10 rounded-lg" />
+                    <Input id="power_kw" type="text" inputMode="numeric" value={form.power_kw ?? ""} onChange={(e) => setPowerKw(e.target.value.replace(/\D/g, ""))} placeholder="kW" className="h-10 rounded-lg text-gray-900" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-gray-600">Power (HP)</Label>
-                    <Input id="power_hp" type="number" value={form.power_hp ?? ""} onChange={(e) => setPowerHp(e.target.value)} placeholder="450" min={0} className="h-10 rounded-lg" />
+                    <Input id="power_hp" type="text" inputMode="numeric" value={form.power_hp ?? ""} onChange={(e) => setPowerHp(e.target.value.replace(/\D/g, ""))} placeholder="HP" className="h-10 rounded-lg text-gray-900" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-gray-600">Engine (cc)</Label>
-                    <Input id="engine_cc" type="number" value={form.engine_displacement_cc ?? ""} onChange={(e) => setNumber("engine_displacement_cc", e.target.value)} placeholder="2998" min={0} className="h-10 rounded-lg" />
+                    <Input id="engine_cc" type="text" inputMode="numeric" value={form.engine_displacement_cc ?? ""} onChange={(e) => setNumber("engine_displacement_cc", e.target.value.replace(/\D/g, ""))} placeholder="cc" className="h-10 rounded-lg text-gray-900" />
                   </div>
                 </div>
               </div>
@@ -517,7 +496,7 @@ export function AddVehicleWizard({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-8 py-4 border-t bg-white">
+        <div className="flex items-center justify-end gap-3 px-8 py-4 border-t border-gray-200 bg-white">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting} className="rounded-lg">
             Cancel
           </Button>
