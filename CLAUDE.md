@@ -67,7 +67,7 @@ Buyers find a car they like and CARMA shows them the best comparable deals. Hard
 - **Azure PostgreSQL Flexible Server**: `carma.postgres.database.azure.com`, user: `carmaadmin`, pw: `CarmaDB2026!Secure`
 - **Container App**: `carma-ml-api` in resource group `carma` (northeurope)
 - **Container Registry**: `carmaregistry.azurecr.io`
-- **Current API image**: `carmaregistry.azurecr.io/carma-ml-api:v5.1-*` (latest revision)
+- **Current API image**: `carmaregistry.azurecr.io/carma-ml-api:v5.4-casefix` (comparison) / `v1.3` (valuation)
 - Connect via Python psycopg2 with `sslmode='require'` — psql has local SSL issues
 - Never use `psql` directly; use Python scripts or the Bash tool with Python
 
@@ -77,6 +77,7 @@ Buyers find a car they like and CARMA shows them the best comparable deals. Hard
 - **Normalized columns** (added via migration 001): `fuel_type_norm`, `body_type_norm`, `transmission_norm`, `color_norm`, `is_private_seller`
 - Trigger `trg_normalize_fields` auto-populates normalized cols on INSERT/UPDATE
 - Partial indexes: `idx_vd_norm_strict` and `idx_vd_norm_no_fuel` on normalized cols
+- Functional index: `idx_vd_lower_make_model` on `(LOWER(make), LOWER(model))` for case-insensitive matching
 
 ### Ranking Logic (api.py v5)
 - **Hard SQL filters**: make, model, body_type_norm, transmission_norm (never drop)
@@ -87,8 +88,17 @@ Buyers find a car they like and CARMA shows them the best comparable deals. Hard
 - **Final score**: 0.65 × similarity + 0.35 × deal score
 - **10-second hard budget**: SQL timeout 7s, total target <10s
 
+### Supabase (Portfolio Backend)
+- **Project**: `fdbvcxgnsjwyhygkaggd` (eu-north-1)
+- **Tables**: `portfolio_vehicles`, `service_records`, `valuation_history`, `vehicle_media`, `profiles`
+- **Storage bucket**: `vehicle-media` (private, 10MB limit, jpg/png/webp/pdf)
+- **RLS**: All tables use `auth.uid() = user_id` policies; storage uses folder-based `user_id` isolation
+- **Valuation API**: `lib/portfolio-api.ts` calls Flask valuation endpoint with 60s timeout + 3 retries
+
 ### Key Files
-- `RankingMODEL/autoscout-ml/src/api.py` — main Flask API (v5)
+- `RankingMODEL/autoscout-ml/src/api.py` — comparison Flask API (v5, deployed v5.4-casefix)
+- `RankingMODEL/autoscout-ml/src/valuation_api.py` — valuation Flask API (deployed v1.3)
+- `RankingMODEL/autoscout-ml/src/shared.py` — shared DB utils, price parsing, normalization
 - `RankingMODEL/autoscout-ml/migrations/001_normalize_fields.sql` — DB normalization migration
 - `RankingMODEL/autoscout-ml/scripts/backfill_normalized.py` — one-time backfill script
 - `RankingMODEL/autoscout-ml/scripts/eval_recommendations.py` — local testing tool
@@ -102,9 +112,20 @@ Buyers find a car they like and CARMA shows them the best comparable deals. Hard
 - `az containerapp update --resource-group carma --name carma-ml-api --image <image>`
 - API endpoint: `https://carma-ml-api.greenwater-7817a41f.northeurope.azurecontainerapps.io`
 
+### Frontend Architecture
+- **Theme**: `:root` is dark theme, `.theme-b` is light theme. All Radix portals (Dialog, AlertDialog, DropdownMenu) MUST have `theme-b` class on their content element or they render with dark `:root` variables
+- **ThemeProvider**: `next-themes` provider in `app/layout.tsx` via `components/theme-provider.tsx`
+- **Portfolio pages**: portfolio, alerts, settings all have profile dropdown in header (Settings, Sign Out)
+- **Vehicle details modal**: includes service records, valuation chart, and photo/document upload
+- **Vehicle list**: inline sort pills (no Card wrapper), search bar
+
 ### Known Gotchas
 - `!` in passwords breaks shell quoting — use Python scripts or env vars loaded via dotenv
 - Container App ACR login expires — run `az acr login --name carmaregistry` before building
 - `pg_stats` null_frac estimates go stale — don't trust them for exact counts
 - The `mutable tag` problem: pushing to same tag doesn't trigger a new revision — always use a new tag
 - `COUNT(*) WHERE col IS NULL` on 2.9M rows = full table scan, takes 5-10+ min on B1ms
+- Radix Dialog/AlertDialog portals to `<body>` — always add `theme-b` class to `DialogContent`/`AlertDialogContent`
+- Marktplaats prices have decimal format (`48950.0`) — must strip decimal suffix before digit extraction
+- SQL make/model matching must use `LOWER()` with functional index for case-insensitive lookups
+- Always commit and push after completing work — user expects changes on GitHub
