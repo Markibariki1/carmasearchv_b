@@ -218,8 +218,14 @@ def ensure_indexes() -> None:
 # SQL expression constants
 # ---------------------------------------------------------------------------
 
+# Strip trailing decimal portion (.0, .00) FIRST so that marktplaats prices like
+# '48950.0' → '48950' instead of '489500'.  European thousands separators like
+# '€ 94.900' (dot + 3 digits) are left intact and handled by the digit-only strip.
 NUMERIC_PRICE_SQL = (
-    "CAST(NULLIF(REGEXP_REPLACE(price, '[^0-9]', '', 'g'), '') AS DOUBLE PRECISION)"
+    "CAST(NULLIF(REGEXP_REPLACE("
+    "  REGEXP_REPLACE(price, '\\.(\\d{1,2})$', '', 'g'),"  # strip .0 / .00 suffix
+    "  '[^0-9]', '', 'g'"
+    "), '') AS DOUBLE PRECISION)"
 )
 NUMERIC_MILEAGE_SQL = (
     "CAST(NULLIF(REGEXP_REPLACE(COALESCE(CAST(mileage_km AS TEXT), ''), "
