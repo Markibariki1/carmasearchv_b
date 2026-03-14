@@ -23,7 +23,7 @@ export default function AccountPage() {
   // Show loading while checking authentication
   if (loading && !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="theme-b min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Loading...</h1>
           <p className="text-muted-foreground">Checking authentication...</p>
@@ -35,7 +35,7 @@ export default function AccountPage() {
   // Show redirect message for unauthenticated users
   if (!loading && !isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="theme-b min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Please Sign In</h1>
           <p className="text-muted-foreground mb-4">You need to be signed in to access your account.</p>

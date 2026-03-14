@@ -47,6 +47,7 @@
 
 /* Version B: Light theme with deep blue primary */
 .theme-b {
+  color: oklch(0.15 0 0); /* Force dark text — overrides inherited white from :root body */
   --background: oklch(0.985 0 0); /* Near-white background */
   --foreground: oklch(0.15 0 0); /* Dark text */
   --card: oklch(1 0 0); /* White cards */

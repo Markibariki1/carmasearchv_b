@@ -45,7 +45,7 @@ export default function AccountForm({ user }: { user: User }) {
   }
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
+    <div className="theme-b p-6 max-w-xl mx-auto min-h-screen bg-background">
       <h2 className="text-lg font-medium">Your account</h2>
       <form onSubmit={updateProfile} className="space-y-4 mt-4">
         <div>
@@ -69,7 +69,7 @@ export default function AccountForm({ user }: { user: User }) {
         </div>
 
         <div className="flex gap-2">
-          <button className="px-4 py-2 bg-indigo-600 text-white rounded" type="submit" disabled={loading}>
+          <button className="px-4 py-2 bg-primary text-primary-foreground rounded" type="submit" disabled={loading}>
             {loading ? 'Saving...' : 'Save'}
           </button>
 

@@ -29,7 +29,7 @@ export default function ExtensionRedirectPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background text-center">
+      <div className="theme-b min-h-screen flex flex-col items-center justify-center p-6 bg-background text-center">
         <p className="text-destructive mb-4">{error}</p>
         <a href="/" className="text-primary underline">
           Return to homepage
@@ -39,7 +39,7 @@ export default function ExtensionRedirectPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background text-center">
+    <div className="theme-b min-h-screen flex flex-col items-center justify-center p-6 bg-background text-center">
       <p className="text-lg text-muted-foreground mb-6">
         Taking you back to the CARMA extension…
       </p>
