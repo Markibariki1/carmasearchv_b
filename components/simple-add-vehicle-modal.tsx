@@ -66,7 +66,7 @@ export function SimpleAddVehicleModal({ open, onOpenChange, onVehicleAdded }: Si
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="theme-b max-w-md">
         <DialogHeader>
           <DialogTitle>Add New Vehicle</DialogTitle>
         </DialogHeader>

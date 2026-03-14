@@ -140,7 +140,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="theme-b sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
@@ -200,7 +200,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                   placeholder="https://example.com/vehicle-listing"
                   value={formData.vehicleUrl}
                   onChange={(e) => handleInputChange('vehicleUrl', e.target.value)}
-                  className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white placeholder:text-white/40 focus:border-white/30 focus:ring-0 text-base transition-all duration-200 hover:bg-black/30 focus:bg-black/30"
+                  className="h-12 rounded-xl text-base"
                   required
                 />
               </div>
@@ -212,7 +212,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                   placeholder="My Dream Car Alert"
                   value={formData.title}
                   onChange={(e) => handleInputChange('title', e.target.value)}
-                  className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white placeholder:text-white/40 focus:border-white/30 focus:ring-0 text-base transition-all duration-200 hover:bg-black/30 focus:bg-black/30"
+                  className="h-12 rounded-xl text-base"
                 />
               </div>
             </div>
@@ -227,7 +227,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                   placeholder="Tesla Model 3 Under $40k"
                   value={formData.title}
                   onChange={(e) => handleInputChange('title', e.target.value)}
-                  className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white placeholder:text-white/40 focus:border-white/30 focus:ring-0 text-base transition-all duration-200 hover:bg-black/30 focus:bg-black/30"
+                  className="h-12 rounded-xl text-base"
                   required
                 />
               </div>
@@ -247,7 +247,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                       placeholder="Tesla"
                       value={formData.make}
                       onChange={(e) => handleInputChange('make', e.target.value)}
-                      className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white placeholder:text-white/40 focus:border-white/30 focus:ring-0 text-base transition-all duration-200 hover:bg-black/30 focus:bg-black/30"
+                      className="h-12 rounded-xl text-base"
                     />
                   </div>
                   <div className="space-y-2">
@@ -258,7 +258,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                       placeholder="Model 3"
                       value={formData.model}
                       onChange={(e) => handleInputChange('model', e.target.value)}
-                      className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white placeholder:text-white/40 focus:border-white/30 focus:ring-0 text-base transition-all duration-200 hover:bg-black/30 focus:bg-black/30"
+                      className="h-12 rounded-xl text-base"
                     />
                   </div>
                 </div>
@@ -272,7 +272,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                       placeholder="2023"
                       value={formData.year}
                       onChange={(e) => handleInputChange('year', e.target.value)}
-                      className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white placeholder:text-white/40 focus:border-white/30 focus:ring-0 text-base transition-all duration-200 hover:bg-black/30 focus:bg-black/30"
+                      className="h-12 rounded-xl text-base"
                     />
                   </div>
                   <div className="space-y-2">
@@ -283,7 +283,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                       placeholder="50000"
                       value={formData.maxPrice}
                       onChange={(e) => handleInputChange('maxPrice', e.target.value)}
-                      className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white placeholder:text-white/40 focus:border-white/30 focus:ring-0 text-base transition-all duration-200 hover:bg-black/30 focus:bg-black/30"
+                      className="h-12 rounded-xl text-base"
                     />
                   </div>
                 </div>
@@ -297,7 +297,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                       placeholder="San Francisco, CA"
                       value={formData.location}
                       onChange={(e) => handleInputChange('location', e.target.value)}
-                      className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white placeholder:text-white/40 focus:border-white/30 focus:ring-0 text-base transition-all duration-200 hover:bg-black/30 focus:bg-black/30"
+                      className="h-12 rounded-xl text-base"
                     />
                   </div>
                   <div className="space-y-2">
@@ -308,7 +308,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                       placeholder="50000"
                       value={formData.maxMileage}
                       onChange={(e) => handleInputChange('maxMileage', e.target.value)}
-                      className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white placeholder:text-white/40 focus:border-white/30 focus:ring-0 text-base transition-all duration-200 hover:bg-black/30 focus:bg-black/30"
+                      className="h-12 rounded-xl text-base"
                     />
                   </div>
                 </div>
@@ -326,7 +326,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                   <div className="space-y-2">
                     <Label htmlFor="fuelType">Fuel Type</Label>
                     <Select value={formData.fuelType} onValueChange={(value) => handleInputChange('fuelType', value)}>
-                      <SelectTrigger className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white focus:border-white/30 focus:ring-0">
+                      <SelectTrigger className="h-12 rounded-xl">
                         <SelectValue placeholder="Any" />
                       </SelectTrigger>
                       <SelectContent>
@@ -340,7 +340,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                   <div className="space-y-2">
                     <Label htmlFor="transmission">Transmission</Label>
                     <Select value={formData.transmission} onValueChange={(value) => handleInputChange('transmission', value)}>
-                      <SelectTrigger className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white focus:border-white/30 focus:ring-0">
+                      <SelectTrigger className="h-12 rounded-xl">
                         <SelectValue placeholder="Any" />
                       </SelectTrigger>
                       <SelectContent>
@@ -353,7 +353,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                   <div className="space-y-2">
                     <Label htmlFor="bodyType">Body Type</Label>
                     <Select value={formData.bodyType} onValueChange={(value) => handleInputChange('bodyType', value)}>
-                      <SelectTrigger className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white focus:border-white/30 focus:ring-0">
+                      <SelectTrigger className="h-12 rounded-xl">
                         <SelectValue placeholder="Any" />
                       </SelectTrigger>
                       <SelectContent>
@@ -372,7 +372,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                   <div className="space-y-2">
                     <Label htmlFor="drivetrain">Drivetrain</Label>
                     <Select value={formData.drivetrain} onValueChange={(value) => handleInputChange('drivetrain', value)}>
-                      <SelectTrigger className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white focus:border-white/30 focus:ring-0">
+                      <SelectTrigger className="h-12 rounded-xl">
                         <SelectValue placeholder="Any" />
                       </SelectTrigger>
                       <SelectContent>
@@ -386,7 +386,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                   <div className="space-y-2">
                     <Label htmlFor="engineType">Engine Type</Label>
                     <Select value={formData.engineType} onValueChange={(value) => handleInputChange('engineType', value)}>
-                      <SelectTrigger className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white focus:border-white/30 focus:ring-0">
+                      <SelectTrigger className="h-12 rounded-xl">
                         <SelectValue placeholder="Any" />
                       </SelectTrigger>
                       <SelectContent>
@@ -415,7 +415,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                     variant="outline"
                     size="sm"
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-10 px-4 hover:bg-black/30 text-white font-medium transition-all duration-300"
+                    className="h-10 px-4 rounded-xl font-medium"
                   >
                     {showAdvanced ? 'Hide' : 'Show'} Advanced
                   </Button>
@@ -427,7 +427,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                       <div className="space-y-2">
                         <Label htmlFor="exteriorColor">Exterior Color</Label>
                         <Select value={formData.exteriorColor} onValueChange={(value) => handleInputChange('exteriorColor', value)}>
-                          <SelectTrigger className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white focus:border-white/30 focus:ring-0">
+                          <SelectTrigger className="h-12 rounded-xl">
                             <SelectValue placeholder="Any" />
                           </SelectTrigger>
                           <SelectContent>
@@ -447,7 +447,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                       <div className="space-y-2">
                         <Label htmlFor="interiorColor">Interior Color</Label>
                         <Select value={formData.interiorColor} onValueChange={(value) => handleInputChange('interiorColor', value)}>
-                          <SelectTrigger className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white focus:border-white/30 focus:ring-0">
+                          <SelectTrigger className="h-12 rounded-xl">
                             <SelectValue placeholder="Any" />
                           </SelectTrigger>
                           <SelectContent>
@@ -466,7 +466,7 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
                     <div className="space-y-2">
                       <Label htmlFor="interiorMaterial">Interior Material</Label>
                       <Select value={formData.interiorMaterial} onValueChange={(value) => handleInputChange('interiorMaterial', value)}>
-                        <SelectTrigger className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl h-12 text-white focus:border-white/30 focus:ring-0">
+                        <SelectTrigger className="h-12 rounded-xl">
                           <SelectValue placeholder="Any" />
                         </SelectTrigger>
                         <SelectContent>
@@ -506,10 +506,10 @@ export function AddAlertModal({ isOpen, onClose, onAddAlert }: AddAlertModalProp
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} className="bg-black/20 backdrop-blur-sm border border-white/20 hover:bg-black/30 text-white font-medium rounded-2xl h-12 px-6 transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]">
+            <Button type="button" variant="outline" onClick={onClose} className="h-12 px-6 rounded-xl font-medium">
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-white/20 backdrop-blur-sm border border-white/20 hover:bg-white/30 text-white font-medium rounded-2xl h-12 px-6 transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]">
+            <Button type="submit" disabled={isLoading} className="h-12 px-6 rounded-xl font-medium">
               {isLoading ? "Creating..." : "Create Alert"}
             </Button>
           </DialogFooter>

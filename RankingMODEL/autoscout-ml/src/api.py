@@ -444,19 +444,19 @@ def find_candidate_rows(
         if fuel_norm:
             attempts.append((
                 "strict",
-                "make = %s AND model = %s AND body_type_norm = %s "
+                "LOWER(make) = LOWER(%s) AND LOWER(model) = LOWER(%s) AND body_type_norm = %s "
                 "AND transmission_norm = %s AND fuel_type_norm = %s",
                 [make, model, body_norm, trans_norm, fuel_norm],
             ))
         attempts.append((
             "no_fuel",
-            "make = %s AND model = %s AND body_type_norm = %s AND transmission_norm = %s",
+            "LOWER(make) = LOWER(%s) AND LOWER(model) = LOWER(%s) AND body_type_norm = %s AND transmission_norm = %s",
             [make, model, body_norm, trans_norm],
         ))
     else:
         attempts = [(
             "make_model_only",
-            "make = %s AND model = %s",
+            "LOWER(make) = LOWER(%s) AND LOWER(model) = LOWER(%s)",
             [make, model],
         )]
 

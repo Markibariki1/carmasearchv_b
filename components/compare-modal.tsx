@@ -306,7 +306,7 @@ export function CompareModal({ isOpen, onClose, className, initialUrl, initialFi
 
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogChange}>
-      <DialogContent className={`sm:max-w-6xl max-h-[95vh] overflow-y-auto bg-background/95 backdrop-blur-xl border border-border ${className || ""}`}>
+      <DialogContent className={`theme-b sm:max-w-6xl max-h-[95vh] overflow-y-auto bg-background/95 backdrop-blur-xl border border-border ${className || ""}`}>
         <DialogHeader className="border-b border-border pb-6">
           <DialogTitle className="text-2xl font-bold text-foreground flex items-center gap-3">
             <Target className="h-6 w-6 text-primary" />

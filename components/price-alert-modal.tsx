@@ -75,7 +75,7 @@ export function PriceAlertModal({ open, onOpenChange }: PriceAlertModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg relative">
+      <DialogContent className="theme-b max-w-lg relative">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />

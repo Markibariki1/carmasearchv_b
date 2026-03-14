@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useServiceRecords } from "@/hooks/use-service-records"
 import { useValuationHistory } from "@/hooks/use-valuation-history"
 import { AddServiceRecordForm } from "./add-service-record-form"
+import { VehicleMediaSection } from "./vehicle-media-section"
 import type { PortfolioVehicle, ServiceRecordInsert } from "@/types/portfolio"
 
 interface VehicleDetailsModalProps {
@@ -95,7 +96,7 @@ export function VehicleDetailsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden p-0">
+      <DialogContent className="theme-b max-w-5xl max-h-[95vh] overflow-hidden p-0">
         <DialogHeader className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-2xl font-bold truncate">
@@ -352,6 +353,17 @@ export function VehicleDetailsModal({
                 ) : (
                   <p className="text-xs text-muted-foreground">No service records yet. Add one to start tracking maintenance.</p>
                 )}
+              </div>
+
+              <Separator />
+
+              {/* Photos & Documents */}
+              <div>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Photos & Documents
+                </h3>
+                <VehicleMediaSection vehicleId={vehicle.id} />
               </div>
             </div>
           </div>

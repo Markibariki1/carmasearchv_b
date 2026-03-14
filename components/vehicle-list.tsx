@@ -1,11 +1,10 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TrendingUp, TrendingDown, Eye, Edit, Trash2, Search, Filter, Plus, RefreshCw, Loader2, AlertTriangle } from "lucide-react"
+import { TrendingUp, TrendingDown, Eye, Edit, Trash2, Search, Loader2, AlertTriangle } from "lucide-react"
 import { useState, useMemo } from "react"
 import { VehicleDetailsModal } from "./vehicle-details-modal"
 import { AddVehicleWizard } from "./add-vehicle-wizard"
@@ -17,7 +16,6 @@ interface VehicleListProps {
   onDelete: (id: string) => Promise<boolean>
   onUpdate: (id: string, data: PortfolioVehicleUpdate) => Promise<boolean>
   onRefreshValuation: (id: string) => Promise<boolean>
-  onAddVehicle: () => void
   valuatingIds: Set<string>
   valuationErrors: Map<string, string>
 }
@@ -209,23 +207,13 @@ function VehicleCard({
   )
 }
 
-export function VehicleList({ vehicles, onDelete, onUpdate, onRefreshValuation, onAddVehicle, valuatingIds, valuationErrors }: VehicleListProps) {
+export function VehicleList({ vehicles, onDelete, onUpdate, onRefreshValuation, valuatingIds, valuationErrors }: VehicleListProps) {
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedMake, setSelectedMake] = useState("all")
   const [sortBy, setSortBy] = useState("value-desc")
   const [visibleCount, setVisibleCount] = useState(8)
 
-  // Dynamic make options from actual vehicles
-  const makeOptions = useMemo(() => {
-    const makes = [...new Set(vehicles.map((v) => v.make))].sort()
-    return makes
-  }, [vehicles])
-
   const filteredVehicles = useMemo(() => {
     let result = vehicles.filter((vehicle) => {
-      if (selectedMake !== "all" && vehicle.make.toLowerCase() !== selectedMake.toLowerCase()) {
-        return false
-      }
       if (
         searchTerm &&
         !`${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim || ""}`.toLowerCase().includes(searchTerm.toLowerCase())
@@ -253,63 +241,44 @@ export function VehicleList({ vehicles, onDelete, onUpdate, onRefreshValuation, 
     })
 
     return result
-  }, [vehicles, selectedMake, searchTerm, sortBy])
+  }, [vehicles, searchTerm, sortBy])
 
   return (
     <div className="space-y-4">
-      {/* Header with Search and Filters */}
-      <Card className="border-border/50">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold">Portfolio Vehicles</CardTitle>
-            <Button size="sm" onClick={onAddVehicle}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Vehicle
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search vehicles..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Select value={selectedMake} onValueChange={setSelectedMake}>
-                <SelectTrigger className="w-32">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Make" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Makes</SelectItem>
-                  {makeOptions.map((make) => (
-                    <SelectItem key={make} value={make.toLowerCase()}>{make}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-36">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="value-desc">Value (High to Low)</SelectItem>
-                  <SelectItem value="value-asc">Value (Low to High)</SelectItem>
-                  <SelectItem value="gain-desc">Gain (High to Low)</SelectItem>
-                  <SelectItem value="gain-asc">Loss (High to Low)</SelectItem>
-                  <SelectItem value="date-desc">Recently Added</SelectItem>
-                  <SelectItem value="date-asc">Oldest First</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Search and Sort Controls */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="relative flex-1 w-full sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search vehicles..."
+            className="pl-10 h-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { value: "value-desc", label: "Value \u2193" },
+            { value: "value-asc", label: "Value \u2191" },
+            { value: "gain-desc", label: "Gain \u2193" },
+            { value: "gain-asc", label: "Loss \u2193" },
+            { value: "date-desc", label: "Newest" },
+            { value: "date-asc", label: "Oldest" },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setSortBy(opt.value)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                sortBy === opt.value
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Vehicle Grid */}
       {filteredVehicles.length > 0 ? (

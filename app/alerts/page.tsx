@@ -7,8 +7,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AddAlertModal } from "@/components/add-alert-modal"
 import { AlertList } from "@/components/alert-list"
 import { PriceNotification } from "@/components/price-notification"
-import { ArrowLeft, Bell, Plus, Settings } from "lucide-react"
+import { ArrowLeft, Bell, LogOut, Plus, Settings, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/hooks/use-auth"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 
 interface PriceAlert {
@@ -57,6 +65,7 @@ interface PriceNotification {
 
 export default function AlertsPage() {
   const { toast } = useToast()
+  const { user, signOut } = useAuth()
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [alerts, setAlerts] = useState<PriceAlert[]>([
     {
@@ -218,12 +227,25 @@ export default function AlertsPage() {
               </div>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <Link href="/settings">
-                <Button variant="outline" size="sm" className="hidden sm:inline-flex gap-1.5">
-                  <Settings className="h-4 w-4" />
-                  Settings
-                </Button>
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="hidden sm:inline-flex gap-1.5">
+                    <User className="h-4 w-4" />
+                    {user?.email?.split("@")[0] ?? "Profile"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44 theme-b">
+                  <DropdownMenuItem onClick={() => (window.location.href = "/settings")}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => signOut()} className="text-destructive focus:text-destructive">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button size="sm" onClick={() => setIsAddModalOpen(true)}>
                 <Plus className="h-4 w-4 mr-1.5" />
                 Add Alert

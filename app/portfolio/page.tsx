@@ -14,6 +14,7 @@ import {
   Bell,
   CheckCircle2,
   LogIn,
+  LogOut,
   Settings,
   Star,
   TrendingUp,
@@ -23,6 +24,13 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import Image from "next/image"
 import Link from "next/link"
 import type { PortfolioVehicle, PortfolioVehicleInsert } from "@/types/portfolio"
@@ -55,7 +63,7 @@ function computeGainPercent(v: PortfolioVehicle): number {
 }
 
 export default function PortfolioPage() {
-  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const { user, loading: authLoading, isAuthenticated, signOut } = useAuth()
   const { vehicles, loading: portfolioLoading, addVehicle, deleteVehicle, updateVehicle, refreshValuation, valuatingIds, valuationErrors } = usePortfolio()
   const [addVehicleOpen, setAddVehicleOpen] = useState(false)
 
@@ -175,12 +183,25 @@ export default function PortfolioPage() {
                   <span className="hidden sm:inline">Alerts</span>
                 </Button>
               </Link>
-              <Link href="/settings">
-                <Button variant="ghost" size="sm" className="gap-1.5">
-                  <Settings className="h-4 w-4" />
-                  <span className="hidden sm:inline">Settings</span>
-                </Button>
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="ml-1 gap-1.5">
+                    <User className="h-4 w-4" />
+                    <span className="hidden sm:inline">{user?.email?.split("@")[0] ?? "Profile"}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44 theme-b">
+                  <DropdownMenuItem onClick={() => (window.location.href = "/settings")}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => signOut()} className="text-destructive focus:text-destructive">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
@@ -319,7 +340,6 @@ export default function PortfolioPage() {
               onDelete={deleteVehicle}
               onUpdate={updateVehicle}
               onRefreshValuation={refreshValuation}
-              onAddVehicle={() => setAddVehicleOpen(true)}
               valuatingIds={valuatingIds}
               valuationErrors={valuationErrors}
             />

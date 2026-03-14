@@ -158,7 +158,7 @@ export function AddPaymentMethodModal({ isOpen, onClose, onAddPaymentMethod }: A
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="theme-b sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
@@ -177,7 +177,7 @@ export function AddPaymentMethodModal({ isOpen, onClose, onAddPaymentMethod }: A
               variant="outline"
               size="sm"
               onClick={handleChromeAutofill}
-              className="text-xs bg-black/20 backdrop-blur-sm border border-white/20 hover:bg-black/30 text-white font-medium rounded-2xl h-10 px-4 transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]"
+              className="text-xs h-10 px-4 rounded-xl font-medium"
             >
               <Lock className="h-3 w-3 mr-1" />
               Use Chrome Autofill
@@ -271,10 +271,10 @@ export function AddPaymentMethodModal({ isOpen, onClose, onAddPaymentMethod }: A
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} className="bg-black/20 backdrop-blur-sm border border-white/20 hover:bg-black/30 text-white font-medium rounded-2xl h-12 px-6 transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]">
+            <Button type="button" variant="outline" onClick={onClose} className="h-12 px-6 rounded-xl font-medium">
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-white/20 backdrop-blur-sm border border-white/20 hover:bg-white/30 text-white font-medium rounded-2xl h-12 px-6 transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]">
+            <Button type="submit" disabled={isLoading} className="h-12 px-6 rounded-xl font-medium">
               {isLoading ? "Adding..." : "Add Payment Method"}
             </Button>
           </DialogFooter>

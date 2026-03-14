@@ -116,6 +116,21 @@ export interface ValuationRequest {
   power_kw?: number
 }
 
+// Vehicle media (photos, documents)
+export interface VehicleMedia {
+  id: string
+  vehicle_id: string
+  user_id: string
+  file_name: string
+  file_path: string
+  file_type: 'image' | 'document'
+  mime_type: string
+  file_size?: number | null
+  caption?: string | null
+  service_record_id?: string | null
+  created_at: string
+}
+
 // Dropdown option lists for the add-vehicle wizard
 export const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'Hybrid', 'Plugin Hybrid', 'LPG', 'CNG'] as const
 export const TRANSMISSIONS = ['Manual', 'Automatic'] as const
