@@ -19,17 +19,19 @@ import {
 } from "@/components/ui/alert-dialog"
 import { AddPaymentMethodModal } from "@/components/add-payment-method-modal"
 import { useTheme } from "next-themes"
-import { 
-  ArrowLeft, 
-  User, 
-  Bell, 
-  CreditCard, 
-  Shield, 
+import {
+  ArrowLeft,
+  User,
+  Bell,
+  CreditCard,
+  Shield,
   Palette,
   Settings as SettingsIcon,
   Trash2,
   MoreVertical,
-  Star
+  Star,
+  LogOut,
+  Briefcase,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
@@ -40,6 +42,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
@@ -495,7 +498,7 @@ export default function SettingsPage() {
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="theme-b">
                           {!paymentMethod.isDefault && (
                             <DropdownMenuItem
                               onClick={() => handleSetDefaultPayment(paymentMethod.id)}
@@ -666,9 +669,38 @@ export default function SettingsPage() {
               <div className="w-px h-5 bg-border" />
               <h1 className="text-lg font-bold">Settings</h1>
             </div>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <a href="/portfolio" className="hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted">Portfolio</a>
-              <a href="/alerts" className="hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted">Alerts</a>
+            <div className="flex items-center gap-1">
+              <Link href="/portfolio">
+                <Button variant="ghost" size="sm" className="gap-1.5">
+                  <Briefcase className="h-4 w-4" />
+                  <span className="hidden sm:inline">Portfolio</span>
+                </Button>
+              </Link>
+              <Link href="/alerts">
+                <Button variant="ghost" size="sm" className="gap-1.5">
+                  <Bell className="h-4 w-4" />
+                  <span className="hidden sm:inline">Alerts</span>
+                </Button>
+              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="ml-1 gap-1.5">
+                    <User className="h-4 w-4" />
+                    <span className="hidden sm:inline">{user?.email?.split("@")[0] ?? "Profile"}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44 theme-b">
+                  <DropdownMenuItem onClick={() => setActiveSection('account')}>
+                    <User className="h-4 w-4 mr-2" />
+                    Account
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>

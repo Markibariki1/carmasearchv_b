@@ -81,7 +81,7 @@ function VehicleCard({
 
           <div className="p-4 space-y-4">
             <div>
-              <h3 className="font-semibold text-lg leading-tight">
+              <h3 className="font-semibold text-lg leading-tight truncate">
                 {vehicle.year} {vehicle.make} {vehicle.model}
               </h3>
               {vehicle.trim && <p className="text-sm text-muted-foreground">{vehicle.trim}</p>}

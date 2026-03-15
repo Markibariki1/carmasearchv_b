@@ -216,7 +216,7 @@ export function PriceNotification({ notification, onMarkAsRead, onDismiss, onUpd
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="theme-b">
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStar(); }}>
                     {notification.isStarred ? '⭐ Unstar' : '⭐ Star'}
                   </DropdownMenuItem>

@@ -22,6 +22,7 @@ import {
   User,
   Zap,
 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import {
@@ -105,6 +106,17 @@ export default function PortfolioPage() {
         }
       })
   }, [vehicles])
+
+  const { toast } = useToast()
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      toast({ title: "Signed out", description: "See you next time!" })
+    } catch {
+      toast({ title: "Error", description: "Could not sign out.", variant: "destructive" })
+    }
+  }
 
   const handleAddVehicle = async (data: PortfolioVehicleInsert) => {
     const result = await addVehicle(data)
@@ -196,7 +208,7 @@ export default function PortfolioPage() {
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => signOut()} className="text-destructive focus:text-destructive">
+                  <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign Out
                   </DropdownMenuItem>

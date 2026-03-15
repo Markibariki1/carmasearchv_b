@@ -141,7 +141,7 @@ export function AlertList({ alerts, onUpdateAlert, onDeleteAlert, onEditAlert }:
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="theme-b">
                     <DropdownMenuItem onClick={() => onEditAlert(alert)}>
                       <Edit className="h-4 w-4 mr-2" />
                       Edit
